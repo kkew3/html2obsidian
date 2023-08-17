@@ -105,6 +105,7 @@ class KeepOnlySupportedTarget:
 
     def start(self, tag, attrib):
         self.active = True
+        tag = tag.lower()
         # the separator
         if tag == 'hr':
             self.nodes.append(StartElement(tag))
