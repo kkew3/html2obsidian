@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Backprop is not just the chain rule &mdash; Graduate Descent</title>
+
+  <link href="https://fonts.googleapis.com/css?family=EB+Garamond&display=swap"
+        rel="stylesheet">
+
+  <meta name="author" content="Tim Vieira">
+
+  <link href="/blog/atom.xml" type="application/atom+xml" rel="alternate"
+        title="Graduate Descent Atom Feed" />
+
+
+
+
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <link href="https://timvieira.github.io/blog/favicon.png" rel="icon">
+
+  <link href="https://timvieira.github.io/blog/theme/css/main.css" media="screen, projection"
+        rel="stylesheet" type="text/css">
+
+</head>
+
+<body>
+  <header role="banner"><hgroup>
+  <h1><a href="https://timvieira.github.io/blog/">Graduate Descent</a></h1>
+</hgroup></header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <!--
+  <li><a href="/blog/atom.xml" rel="subscribe-atom">Feed</a></li>
+  -->
+</ul>
+
+
+<ul class="main-navigation">
+    <li><a href="https://timvieira.github.io/">About</a></li>
+    <li><a href="/blog/index.html">Archive</a></li>
+</ul></nav>
+  <div id="main">
+    <div id="content">
+<div>
+  <article class="hentry" role="article">
+<header>
+      <h1 class="entry-title">Backprop is not just the chain rule</h1>
+    <p class="meta">
+<time datetime="2017-08-18T00:00:00-04:00" pubdate>Aug 18, 2017</time>  <span class="byline author vcard">
+    by <span class="fn">
+        Tim Vieira
+    </span>
+  </span>
+  <!--
+<time datetime="2017-08-18T00:00:00-04:00" pubdate>Aug 18, 2017</time>  <span class="categories">
+    <a class='category' href='https://timvieira.github.io/blog/category/misc.html'>misc</a>
+  </span>
+  -->
+
+  <span class="tags">
+    <a class="tag" href="https://timvieira.github.io/blog/tag/calculus.html">calculus</a><!--,-->    <a class="tag" href="https://timvieira.github.io/blog/tag/automatic-differentiation.html">automatic-differentiation</a><!--,-->    <a class="tag" href="https://timvieira.github.io/blog/tag/implicit-function-theorem.html">implicit-function-theorem</a><!--,-->    <a class="tag" href="https://timvieira.github.io/blog/tag/lagrange-multipliers.html">Lagrange-multipliers</a>  </span>
+    </p>
+</header>
+
+  <div class="entry-content"><p>Almost everyone I know says that "backprop is just the chain rule." Although
+that's <em>basically true</em>, there are some subtle and beautiful things about
+automatic differentiation techniques (including backprop) that will not be
+appreciated with this <em>dismissive</em> attitude.</p>
+<p>This leads to a poor understanding. As
+<a href="http://timvieira.github.io/blog/post/2016/09/25/evaluating-fx-is-as-fast-as-fx/">I have ranted before</a>:
+people do not understand basic facts about autodiff.</p>
+<ul>
+<li>Evaluating <span class="math">\(\nabla f(x)\)</span> is provably as fast as evaluating <span class="math">\(f(x)\)</span>.</li>
+</ul>
+<!-- Let that sink in. Computing the gradient&mdash;an essential ingredient to
+efficient optimization&mdash;is no slower to compute than the function
+itself. Contrast that with the finite-difference gradient approximation, which
+is quite accurate, but its runtime is $\textrm{dim}(x)$ times slower than
+evaluating $f$
+([discussed here](http://timvieira.github.io/blog/post/2017/04/21/how-to-test-gradient-implementations/))!
+-->
+
+<ul>
+<li>Code for <span class="math">\(\nabla f(x)\)</span> can be derived by a rote program transformation, even
+  if the code has control flow structures like loops and intermediate variables
+  (as long as the control flow is independent of <span class="math">\(x\)</span>). You can even do this
+  "automatic" transformation by hand!</li>
+</ul>
+<h3>Autodiff <span class="math">\(\ne\)</span> what you learned in calculus</h3>
+<p>Let's try to understand the difference between autodiff and the type of
+differentiation that you learned in calculus, which is called <em>symbolic</em>
+differentiation.</p>
+<p>I'm going to use an example from
+<a href="https://people.cs.umass.edu/~domke/courses/sml2011/08autodiff_nnets.pdf">Justin Domke's notes</a>,
+</p>
+<div class="math">$$
+f(x) = \exp(\exp(x) + \exp(x)^2) + \sin(\exp(x) + \exp(x)^2).
+$$</div>
+<!--
+If we plug-and-chug with the chain rule, we get a correct expression for the
+derivative,
+$$\small
+\frac{\partial f}{\partial x} =
+\exp(\exp(x) + \exp(x)^2) (\exp(x) + 2 \exp(x) \exp(x)) \\
+\quad\quad\small+ \cos(\exp(x) + \exp(x)^2) (\exp(x) + 2 \exp(x) \exp(x)).
+$$
+
+However, this expression leaves something to be desired because it has a lot of
+repeated evaluations of the same function. This is clearly bad, if we want to
+turn it into source code.
+-->
+
+<p>If we were writing <em>a program</em> (e.g., in Python) to compute <span class="math">\(f\)</span>, we'd take
+advantage of the fact that it has a lot of repeated evaluations for efficiency.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">a</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">sin</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">d</span> <span class="o">+</span> <span class="n">e</span>
+</code></pre></div>
+
+
+<p>Symbolic differentiation would have to use the "flat" version of this function,
+so no intermediate variable <span class="math">\(\Rightarrow\)</span> slow.</p>
+<p>Automatic differentiation lets us differentiate a program with <em>intermediate</em>
+variables.</p>
+<ul>
+<li>
+<p>The rules for transforming the code for a function into code for the gradient
+  are really minimal (fewer things to memorize!). Additionally, the rules are
+  more general than in symbolic case because they handle as a superset of
+  programs.</p>
+</li>
+<li>
+<p>Quite <a href="http://conal.net/papers/beautiful-differentiation/">beautifully</a>, the
+  program for the gradient <em>has exactly the same structure</em> as the function,
+  which implies that we get the same runtime (up to some constants factors).</p>
+</li>
+</ul>
+<p>I won't give the details of how to execute the backpropagation transform to the
+program. You can get that from
+<a href="https://people.cs.umass.edu/~domke/courses/sml2011/08autodiff_nnets.pdf">Justin Domke's notes</a>
+and many other good
+resources. <a href="https://gist.github.com/timvieira/39e27756e1226c2dbd6c36e83b648ec2">Here's some code</a>
+that I wrote that accompanies to the <code>f(x)</code> example, which has a bunch of
+comments describing the manual "automatic" differentiation process on <code>f(x)</code>.</p>
+<!--
+Caveat: You might have seen some *limited* cases where an input variable was
+reused, but chances are that it was something really simple like multiplication
+or division, e.g., $\nabla\! \left[ f(x) \cdot g(x) \right] = f(x) \cdot g'(x)
++ f'(x) \cdot g(x)$, and you just memorized a rule. The rules of autodiff are
+simpler and actually explains why there is a sum in the product rule. You can
+also rederive the quotient rule without a hitch. I'm all about having fewer
+things to memorize!
+-->
+
+<!--
+You might hope that something like common subexpression elimination would save
+the symbolic approach. Indeed that could be leveraged to improve any chunk of
+code, but to match efficiency it's not needed! If we had needed to blow up the
+computation to then shrink it down that would be much less efficient! The "flat"
+version of a program can be exponentially larger than a version with reuse.
+-->
+
+<!-- Only sort of related: think of the exponential blow up in converting a
+Boolean expression from conjunctive normal form to and disjunction normal.  -->
+
+<h2>Autodiff by the method of Lagrange multipliers</h2>
+<p>Let's view the intermediate variables in our optimization problem as simple
+equality constraints in an equivalent <em>constrained</em> optimization problem. It
+turns out that the de facto method for handling constraints, the method Lagrange
+multipliers, recovers <em>exactly</em> the adjoints (intermediate derivatives) in the
+backprop algorithm!</p>
+<p>Here's our example from earlier written in this constraint form:</p>
+<div class="math">$$
+\begin{align*}
+\underset{x}{\text{argmax}}\ &amp; f \\
+\text{s.t.} \quad
+a &amp;= \exp(x) \\
+b &amp;= a^2     \\
+c &amp;= a + b   \\
+d &amp;= \exp(c) \\
+e &amp;= \sin(c) \\
+f &amp;= d + e
+\end{align*}
+$$</div>
+<h4>The general formulation</h4>
+<div class="math">\begin{align*}
+  &amp; \underset{\boldsymbol{x}}{\text{argmax}}\ z_n &amp; \\
+  &amp; \text{s.t.}\quad z_i = x_i                          &amp;\text{ for $1 \le i \le d$} \\
+  &amp; \phantom{\text{s.t.}}\quad z_i = f_i(z_{\alpha(i)}) &amp;\text{ for $d &lt; i \le n$} \\
+  \end{align*}</div>
+<p>The first set of constraint (<span class="math">\(1, \ldots, d\)</span>) are a little silly. They are only
+there to keep our formulation tidy. The variables in the program fall into three
+categories:</p>
+<ul>
+<li>
+<p><strong>input variables</strong> (<span class="math">\(\boldsymbol{x}\)</span>): <span class="math">\(x_1, \ldots, x_d\)</span></p>
+</li>
+<li>
+<p><strong>intermediate variables</strong>: (<span class="math">\(\boldsymbol{z}\)</span>): <span class="math">\(z_i = f_i(z_{\alpha(i)})\)</span> for
+  <span class="math">\(1 \le i \le n\)</span>, where <span class="math">\(\alpha(i)\)</span> is a list of indices from <span class="math">\(\{1, \ldots,
+  n-1\}\)</span> and <span class="math">\(z_{\alpha(i)}\)</span> is the subvector of variables needed to evaluate
+  <span class="math">\(f_i(\cdot)\)</span>. Minor detail: take <span class="math">\(f_{1:d}\)</span> to be the identity function.</p>
+</li>
+<li>
+<p><strong>output variable</strong> (<span class="math">\(z_n\)</span>): We assume that our programs has a singled scalar
+  output variable, <span class="math">\(z_n\)</span>, which represents the quantity we'd like to maximize.</p>
+</li>
+</ul>
+<!-- (It is possible to generalize this story to compute Jacobians of functions
+with multivariate outputs by "scalarizing" the objective, e.g., multiply the
+outputs by a vector. This Gives an efficient program for computing Jacobian
+vector products that can be used to extra Jacobians.)  -->
+
+<p>The relation <span class="math">\(\alpha\)</span> is a
+<a href="https://en.wikipedia.org/wiki/Dependency_graph">dependency graph</a> among
+variables. Thus, <span class="math">\(\alpha(i)\)</span> is the list of <em>incoming</em> edges to node <span class="math">\(i\)</span> and
+<span class="math">\(\beta(j) = \{ i: j \in \alpha(i) \}\)</span> is the set of <em>outgoing</em> edges. For now,
+we'll assume that the dependency graph given by <span class="math">\(\alpha\)</span> is ① acyclic: no <span class="math">\(z_i\)</span>
+can transitively depend on itself.  ② single-assignment: each <span class="math">\(z_i\)</span> appears on
+the left-hand side of <em>exactly one</em> equation.  We'll discuss relaxing these
+assumptions in <a href="#lagrange-backprop-generalization">§ Generalizations</a>.</p>
+<p>The standard way to solve a constrained optimization is to use the method
+Lagrange multipliers, which converts a <em>constrained</em> optimization problem into
+an <em>unconstrained</em> problem with a few more variables <span class="math">\(\boldsymbol{\lambda}\)</span> (one
+per <span class="math">\(x_i\)</span> constraint), called Lagrange multipliers.</p>
+<h4>The Lagrangian</h4>
+<p>To handle constraints, let's dig up a tool from our calculus class,
+<a href="https://en.wikipedia.org/wiki/Lagrange_multiplier">the method of Lagrange multipliers</a>,
+which converts a <em>constrained</em> optimization problem into an <em>unconstrained</em>
+one. The unconstrained version is called "the Lagrangian" of the constrained
+problem. Here is its form for our task,</p>
+<div class="math">$$
+\mathcal{L}\left(\boldsymbol{x}, \boldsymbol{z}, \boldsymbol{\lambda}\right)
+= z_n - \sum_{i=1}^n \lambda_i \cdot \left( z_i - f_i(z_{\alpha(i)}) \right).
+$$</div>
+<p>Optimizing the Lagrangian amounts to solving the following nonlinear system of
+equations, which give necessary, but not sufficient, conditions for optimality,</p>
+<div class="math">$$
+\nabla \mathcal{L}\left(\boldsymbol{x}, \boldsymbol{z}, \boldsymbol{\lambda}\right) = 0.
+$$</div>
+<p>Let's look a little closer at the Lagrangian conditions by breaking up the
+system of equations into salient parts, corresponding to which variable types
+are affected.</p>
+<p><strong>Intermediate variables</strong> (<span class="math">\(\boldsymbol{z}\)</span>): Optimizing the
+multipliers&mdash;i.e., setting the gradient of Lagrangian
+w.r.t. <span class="math">\(\boldsymbol{\lambda}\)</span> to zero&mdash;ensures that the constraints on
+intermediate variables are satisfied.</p>
+<div class="math">$$
+\begin{eqnarray*}
+\nabla_{\! \lambda_i} \mathcal{L}
+= z_i - f_i(z_{\alpha(i)}) = 0
+\quad\Leftrightarrow\quad z_i = f_i(z_{\alpha(i)})
+\end{eqnarray*}
+$$</div>
+<p>We can use forward propagation to satisfy these equations, which we may regard
+as a block-coordinate step in the context of optimizing the <span class="math">\(\mathcal{L}\)</span>.</p>
+<!--GENERALIZATION:
+However, if they are cyclic dependencies we may need to
+solve a nonlinear system of equations. (TODO: it's unclear what the more general
+cyclic setting is. Perhaps I should having a running example of a cyclic program
+and an acyclic program.)
+-->
+
+<p><strong>Lagrange multipliers</strong> (<span class="math">\(\boldsymbol{\lambda}\)</span>, excluding <span class="math">\(\lambda_n\)</span>):
+  Setting the gradient of the <span class="math">\(\mathcal{L}\)</span> w.r.t. the intermediate variables
+  equal to zeros tells us what to do with the intermediate multipliers.</p>
+<div class="math">\begin{eqnarray*}
+0 &amp;=&amp; \nabla_{\! z_j} \mathcal{L} \\
+&amp;=&amp; \nabla_{\! z_j}\! \left[ z_n - \sum_{i=1}^n \lambda_i \cdot \left( z_i - f_i(z_{\alpha(i)}) \right) \right] \\
+&amp;=&amp; - \sum_{i=1}^n \lambda_i \nabla_{\! z_j}\! \left[ \left( z_i - f_i(z_{\alpha(i)}) \right) \right] \\
+&amp;=&amp; - \left( \sum_{i=1}^n \lambda_i \nabla_{\! z_j}\! \left[ z_i \right] \right) + \left( \sum_{i=1}^n \lambda_i \nabla_{\! z_j}\! \left[ f_i(z_{\alpha(i)}) \right] \right) \\
+&amp;=&amp; - \lambda_j + \sum_{i \in \beta(j)} \lambda_i \frac{\partial f_i(z_{\alpha(i)})}{\partial z_j} \\
+&amp;\Updownarrow&amp; \\
+\lambda_j &amp;=&amp; \sum_{i \in \beta(j)} \lambda_i \frac{\partial f_i(z_{\alpha(i)})}{\partial z_j} \\
+\end{eqnarray*}</div>
+<p>Clearly, <span class="math">\(\frac{\partial f_i(z_{\alpha(i)})}{\partial z_j} = 0\)</span> for <span class="math">\(j \notin
+\alpha(i)\)</span>, which is why the <span class="math">\(\beta(j)\)</span> notation came in handy. By assumption,
+the local derivatives, <span class="math">\(\frac{\partial f_i(z_{\alpha(i)})}{\partial z_j}\)</span> for <span class="math">\(j
+\in \alpha(i)\)</span>, are easy to calculate&mdash;we don't even need the chain rule to
+compute them because they are simple function applications without
+composition. Similar to the equations for <span class="math">\(\boldsymbol{z}\)</span>, solving this linear
+system is another block-coordinate step.</p>
+<p><em>Key observation</em>: The last equation for <span class="math">\(\lambda_j\)</span> should look very familiar:
+It is exactly the equation used in backpropagation! It says that we sum
+<span class="math">\(\lambda_i\)</span> of nodes that immediately depend on <span class="math">\(j\)</span> where we scaled each
+<span class="math">\(\lambda_i\)</span> by the derivative of the function that directly relates <span class="math">\(i\)</span> and
+<span class="math">\(j\)</span>. You should think of the scaling as a "unit conversion" from derivatives of
+type <span class="math">\(i\)</span> to derivatives of type <span class="math">\(j\)</span>.</p>
+<p><strong>Output multiplier</strong> (<span class="math">\(\lambda_n\)</span>): Here we follow the same pattern as for
+  intermediate multipliers.</p>
+<div class="math">$$
+\begin{eqnarray*}
+0 &amp;=&amp; \nabla_{\! z_n}\! \left[ z_n - \sum_{i=1}^n \lambda_i \cdot \left( z_i - f_i(z_{\alpha(i)}) \right) \right] &amp;=&amp; 1 - \lambda_n \\
+ &amp;\Updownarrow&amp; \\
+ \lambda_n &amp;=&amp; 1
+\end{eqnarray*}
+$$</div>
+<p><strong>Input multipliers</strong> <span class="math">\((\boldsymbol{\lambda}_{1:d})\)</span>: Our dummy constraints
+  gives us <span class="math">\(\boldsymbol{\lambda}_{1:d}\)</span>, which are conveniently equal to the
+  gradient of the function we're optimizing:</p>
+<div class="math">$$
+\nabla_{\!\boldsymbol{x}} f(\boldsymbol{x}) = \boldsymbol{\lambda}_{1:d}.
+$$</div>
+<p>Of course, this interpretation is only precise when ① the constraints are
+satisfied (<span class="math">\(\boldsymbol{z}\)</span> equations) and ② the linear system on multipliers is
+satisfied (<span class="math">\(\boldsymbol{\lambda}\)</span> equations).</p>
+<p><strong>Input variables</strong> (<span class="math">\(\boldsymbol{x}\)</span>): Unfortunately, the there is no
+  closed-form solution to how to set <span class="math">\(\boldsymbol{x}\)</span>. For this we resort to
+  something like gradient ascent. Conveniently, <span class="math">\(\nabla_{\!\boldsymbol{x}}
+  f(\boldsymbol{x}) = \boldsymbol{\lambda}_{1:d}\)</span>, which we can use to optimize
+  <span class="math">\(\boldsymbol{x}\)</span>!</p>
+<div id="lagrange-backprop-generalization"></div>
+
+<h3>Generalizations</h3>
+<p>We can think of these equations for <span class="math">\(\boldsymbol{\lambda}\)</span> as a simple <em>linear</em>
+system of equations, which we are solving by back-substitution when we use the
+backpropagation method. The reason why back-substitution is sufficient for the
+linear system (i.e., we don't need a <em>full</em> linear system solver) is that the
+dependency graph induced by the <span class="math">\(\alpha\)</span> relation is acyclic. If we had needed a
+full linear system solver, the solution would take <span class="math">\(\mathcal{O}(n^3)\)</span> time
+instead of linear time, seriously blowing-up our nice runtime!</p>
+<p>This connection to linear systems is interesting: It tells us that we can
+compute <em>global</em> gradients in cyclic graphs. All we'd need is to run a linear
+system solver to stitch together <em>local</em> gradients! That is exactly what the
+<a href="https://en.wikipedia.org/wiki/Implicit_function_theorem">implicit function theorem</a>
+says!</p>
+<p>Cyclic constraints add some expressive powerful to our "constraint language," and
+it's interesting that we can still efficiently compute gradients in this
+setting. An example of what a general type of cyclic constraint looks like is</p>
+<div class="math">$$
+\begin{align*}
+&amp; \underset{\boldsymbol{x}}{\text{argmax}}\, z_n \\
+&amp; \text{s.t.}\quad g(\boldsymbol{z}) = \boldsymbol{0} \\
+&amp; \text{and}\quad \boldsymbol{z}_{1:d} = \boldsymbol{x}
+\end{align*}
+$$</div>
+<p>where <span class="math">\(g\)</span> can be any smooth multivariate function of the intermediate variables!
+Of course, allowing cyclic constraints comes at the cost of a more-difficult
+analogue of "the forward pass" to satisfy the <span class="math">\(\boldsymbol{z}\)</span> equations (if we
+want to keep it a block-coordinate step). The <span class="math">\(\boldsymbol{\lambda}\)</span> equations
+are now a linear system that requires a linear solver (e.g., Gaussian
+elimination).</p>
+<p>Example use cases:</p>
+<ul>
+<li>
+<p>Bi-level optimization: Solving an optimization problem with another one inside
+  it. For example,
+  <a href="http://timvieira.github.io/blog/post/2016/03/05/gradient-based-hyperparameter-optimization-and-the-implicit-function-theorem/">gradient-based hyperparameter optimization</a>
+  in machine learning. The implicit function theorem manages to get gradients of
+  hyperparameters without needing to store any of the intermediate states of the
+  optimization algorithm used in the inner optimization! This is a <em>huge</em> memory
+  saver since direct backprop on the inner gradient descent algorithm would
+  require caching all intermediate states. Yikes!</p>
+</li>
+<li>
+<p>Cyclic constraints are useful in many graph algorithms. For example, computing
+  gradients of edge weights in a general finite-state machine or, similarly,
+  computing the value function in a Markov decision process.</p>
+</li>
+</ul>
+<h3>Other methods for optimization?</h3>
+<p>The connection to Lagrangians brings tons of algorithms for constrained
+optimization into the mix! We can imagine using more general algorithms for
+optimizing our function and other ways of enforcing the constraints. We see
+immediately that we could run optimization with adjoints set to values other
+than those that backprop would set them to (i.e., we can optimize them like we'd
+do in other algorithms for optimizing general Lagrangians).</p>
+<h2>Summary</h2>
+<p>Backprop does not directly fall out of the rules for differentiation that you
+learned in calculus (e.g., the chain rule).</p>
+<ul>
+<li>This is because it operates on a more general family of functions: <em>programs</em>
+  which have <em>intermediate variables</em>. Supporting intermediate variables is
+  crucial for implementing both functions and their gradients efficiently.</li>
+</ul>
+<p>I described how we could use something we did learn from calculus 101, the
+method of Lagrange multipliers, to support optimization with intermediate
+variables.</p>
+<ul>
+<li>
+<p>It turned out that backprop is a <em>particular instantiation</em> of the method of
+  Lagrange multipliers, involving block-coordinate steps for solving for the
+  intermediates and multipliers.</p>
+</li>
+<li>
+<p>I also described a neat generalization to support <em>cyclic</em> programs and I
+  hinted at ideas for doing optimization a little differently, deviating from
+  the de facto block-coordinate strategy.</p>
+</li>
+</ul>
+<!--
+<center>
+![Levels of enlightenment](/blog/images/backprop-brain-meme.png)
+</center>
+-->
+
+<h2>Further reading</h2>
+<p>After working out the connection between backprop and the method of Lagrange
+multipliers, I discovered following paper, which beat me to it. I don't think my
+version is too redundant.</p>
+<blockquote>
+<p>Yann LeCun. (1988)
+<a href="http://yann.lecun.com/exdb/publis/pdf/lecun-88.pdf">A Theoretical Framework from Back-Propagation</a>.</p>
+</blockquote>
+<p>Ben Recht has a great blog post that uses the implicit function theorem to
+<em>derive</em> the method of Lagrange multipliers. He also touches on the connection
+to backpropagation.</p>
+<blockquote>
+<p>Ben Recht. (2016)
+<a href="http://www.argmin.net/2016/05/31/mechanics-of-lagrangians/">Mechanics of Lagrangians</a>.</p>
+</blockquote>
+<p>Tom Goldstein's group took the Lagrangian view of backprop and used it to design
+an ADMM approach for optimizing neural nets. The ADMM approach
+can run massively in parallel and can leverage highly optimized solvers for
+subproblems. This work nicely demonstrates that understanding automatic
+differentiation&mdash;in the broader sense that I described in this
+post&mdash;facilitates the development of novel optimization algorithms. <!--
+ADMM is based on a cool reformulation trick, which takes a *big* circuit and
+breaks it up into several *small* circuits (subproblems), which are *decoupled*
+from the big problem because each subproblem gets to freely tune its own *local*
+version of the variables. There is, of course, a global equality constraint on
+the decoupled variables so that we get a correct solution. The global equality
+constraints iteratively bring the subproblems into agreement.--></p>
+<blockquote>
+<p>Gavin Taylor, Ryan Burmeister, Zheng Xu, Bharat Singh, Ankit Patel, Tom Goldstein. (2018)
+<a href="https://arxiv.org/abs/1605.02026">Training Neural Networks Without Gradients: A Scalable ADMM Approach</a>.</p>
+</blockquote>
+<p>The backpropagation algorithm can be cleanly generalized from values to
+functionals!</p>
+<blockquote>
+<p>Alexander Grubb and J. Andrew Bagnell. (2010)
+<a href="https://t.co/5OW5xBT4Y1">Boosted Backpropagation Learning for Training Deep Modular Networks</a>.</p>
+</blockquote>
+<h2>Code</h2>
+<p>I have coded up and tested the Lagrangian perspective on automatic
+differentiation that I presented in this article. The code is available in this
+<a href="https://gist.github.com/timvieira/8addcb81dd622b0108e0e7e06af74185">gist</a>.</p>
+<script src="https://gist.github.com/timvieira/8addcb81dd622b0108e0e7e06af74185.js"></script>
+
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script></div>
+  </article>
+
+  <section>
+    <h1 class="comments">Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript></div>
+  </section>
+</div>
+<aside class="sidebar">
+  <section>
+    <h1>Recent Posts</h1>
+    <ul id="recent_posts">
+      <li class="post">
+          <a href="https://timvieira.github.io/blog/post/2021/03/25/fast-rank-one-updates-to-matrix-inverse/">Fast rank-one updates to matrix inverse?</a>
+      </li>
+      <li class="post">
+          <a href="https://timvieira.github.io/blog/post/2021/03/20/on-the-distribution-of-the-smallest-indices/">On the Distribution of the Smallest Indices</a>
+      </li>
+      <li class="post">
+          <a href="https://timvieira.github.io/blog/post/2021/03/18/on-the-distribution-functions-of-order-statistics/">On the Distribution Functions of Order Statistics</a>
+      </li>
+      <li class="post">
+          <a href="https://timvieira.github.io/blog/post/2020/06/30/animation-of-the-inverse-transform-method/">Animation of the inverse transform method</a>
+      </li>
+      <li class="post">
+          <a href="https://timvieira.github.io/blog/post/2020/06/30/generating-truncated-random-variates/">Generating truncated random variates</a>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+  <h1>Tags</h1>
+    <a href="https://timvieira.github.io/blog/tag/numerical.html">numerical</a>,    <a href="https://timvieira.github.io/blog/tag/efficiency.html">efficiency</a>,    <a href="https://timvieira.github.io/blog/tag/sampling-without-replacement.html">sampling-without-replacement</a>,    <a href="https://timvieira.github.io/blog/tag/statistics.html">statistics</a>,    <a href="https://timvieira.github.io/blog/tag/notebook.html">notebook</a>,    <a href="https://timvieira.github.io/blog/tag/ordered-sampling.html">ordered-sampling</a>,    <a href="https://timvieira.github.io/blog/tag/sampling.html">sampling</a>,    <a href="https://timvieira.github.io/blog/tag/algorithms.html">algorithms</a>,    <a href="https://timvieira.github.io/blog/tag/gumbel.html">Gumbel</a>,    <a href="https://timvieira.github.io/blog/tag/decision-making.html">decision-making</a>,    <a href="https://timvieira.github.io/blog/tag/reservoir-sampling.html">reservoir-sampling</a>,    <a href="https://timvieira.github.io/blog/tag/optimization.html">optimization</a>,    <a href="https://timvieira.github.io/blog/tag/rl.html">rl</a>,    <a href="https://timvieira.github.io/blog/tag/machine-learning.html">machine-learning</a>,    <a href="https://timvieira.github.io/blog/tag/calculus.html">calculus</a>,    <a href="https://timvieira.github.io/blog/tag/automatic-differentiation.html">automatic-differentiation</a>,    <a href="https://timvieira.github.io/blog/tag/implicit-function-theorem.html">implicit-function-theorem</a>,    <a href="https://timvieira.github.io/blog/tag/lagrange-multipliers.html">Lagrange-multipliers</a>,    <a href="https://timvieira.github.io/blog/tag/testing.html">testing</a>,    <a href="https://timvieira.github.io/blog/tag/counterfactual-reasoning.html">counterfactual-reasoning</a>,    <a href="https://timvieira.github.io/blog/tag/importance-sampling.html">importance-sampling</a>,    <a href="https://timvieira.github.io/blog/tag/datastructures.html">datastructures</a>,    <a href="https://timvieira.github.io/blog/tag/incremental-computation.html">incremental-computation</a>,    <a href="https://timvieira.github.io/blog/tag/data-structures.html">data-structures</a>,    <a href="https://timvieira.github.io/blog/tag/rant.html">rant</a>,    <a href="https://timvieira.github.io/blog/tag/hyperparameter-optimization.html">hyperparameter-optimization</a>,    <a href="https://timvieira.github.io/blog/tag/crf.html">crf</a>,    <a href="https://timvieira.github.io/blog/tag/deep-learning.html">deep-learning</a>,    <a href="https://timvieira.github.io/blog/tag/structured-prediction.html">structured-prediction</a>,    <a href="https://timvieira.github.io/blog/tag/visualization.html">visualization</a>  </section>
+
+
+
+<section>
+    <a href="http://twitter.com/xtimv" class="twitter-follow-button" data-show-count="true">Follow @xtimv</a>
+</section>
+</aside>    </div>
+  </div>
+  <footer role="contentinfo"><p>
+    Copyright &copy;  2014&ndash;2021  Tim Vieira &mdash;
+  <span class="credit">Powered by <a href="http://getpelican.com">Pelican</a></span>
+</p></footer>
+  <script src="https://timvieira.github.io/blog/theme/js/modernizr-2.0.js"></script>
+  <script src="https://timvieira.github.io/blog/theme/js/ender.js"></script>
+  <script src="https://timvieira.github.io/blog/theme/js/octopress.js" type="text/javascript"></script>
+  <script type="text/javascript">
+    var disqus_shortname = 'graduatedescent';
+    var disqus_identifier = 'https://timvieira.github.io/blog/post/2017/08/18/backprop-is-not-just-the-chain-rule/';
+    var disqus_url = 'https://timvieira.github.io/blog/post/2017/08/18/backprop-is-not-just-the-chain-rule/';
+    var disqus_title = 'Backprop is not just the chain rule';
+    (function() {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = "//" + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+  </script>
+
+<!--
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-8781169-1', 'auto');
+  ga('send', 'pageview');
+</script>
+-->
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-8781169-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-8781169-1');
+</script>
+
+</body>
+</html>

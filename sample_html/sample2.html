@@ -1,0 +1,498 @@
+<p>In face recognition, triplet loss is used to learn good embeddings (or “encodings”) of faces.
+If you are not familiar with triplet loss, you should first learn about it by watching this <a href="https://www.coursera.org/learn/convolutional-neural-networks/lecture/HuUtN/triplet-loss">coursera video</a> from Andrew Ng’s deep learning specialization.</p>
+
+<p>Triplet loss is known to be difficult to implement, especially if you add the constraints of building a computational graph in TensorFlow.</p>
+
+<p>In this post, I will define the triplet loss and the different strategies to sample triplets.
+I will then explain how to correctly implement triplet loss with online triplet mining in TensorFlow.</p>
+
+<p><br /></p>
+
+<p>About two years ago, I was working on face recognition during my internship at <a href="http://www.reminiz.com">Reminiz</a> and I answered a <a href="https://stackoverflow.com/a/38270293/5098368">question</a> on stackoverflow about implementing triplet loss in TensorFlow. I concluded by saying:</p>
+
+<blockquote>
+  <p>Clearly, implementing triplet loss in Tensorflow is hard, and there are ways to make it more efficient than sampling in python but explaining them would require a whole blog post !</p>
+</blockquote>
+
+<p>Two years later, here we go.</p>
+
+<p><em>All the code can be found on this <a href="https://github.com/omoindrot/tensorflow-triplet-loss">github repository</a>.</em></p>
+
+<p><br /></p>
+
+<p><strong>Table of contents</strong></p>
+
+<ul id="markdown-toc">
+  <li><a href="#triplet-loss-and-triplet-mining" id="markdown-toc-triplet-loss-and-triplet-mining">Triplet loss and triplet mining</a>    <ul>
+      <li><a href="#why-not-just-use-softmax" id="markdown-toc-why-not-just-use-softmax">Why not just use softmax?</a></li>
+      <li><a href="#definition-of-the-loss" id="markdown-toc-definition-of-the-loss">Definition of the loss</a></li>
+      <li><a href="#triplet-mining" id="markdown-toc-triplet-mining">Triplet mining</a></li>
+      <li><a href="#offline-and-online-triplet-mining" id="markdown-toc-offline-and-online-triplet-mining">Offline and online triplet mining</a></li>
+      <li><a href="#strategies-in-online-mining" id="markdown-toc-strategies-in-online-mining">Strategies in online mining</a></li>
+    </ul>
+  </li>
+  <li><a href="#a-naive-implementation-of-triplet-loss" id="markdown-toc-a-naive-implementation-of-triplet-loss">A naive implementation of triplet loss</a></li>
+  <li><a href="#a-better-implementation-with-online-triplet-mining" id="markdown-toc-a-better-implementation-with-online-triplet-mining">A better implementation with online triplet mining</a>    <ul>
+      <li><a href="#compute-the-distance-matrix" id="markdown-toc-compute-the-distance-matrix">Compute the distance matrix</a></li>
+      <li><a href="#batch-all-strategy" id="markdown-toc-batch-all-strategy">Batch all strategy</a></li>
+      <li><a href="#batch-hard-strategy" id="markdown-toc-batch-hard-strategy">Batch hard strategy</a></li>
+      <li><a href="#testing-our-implementation" id="markdown-toc-testing-our-implementation">Testing our implementation</a></li>
+    </ul>
+  </li>
+  <li><a href="#experience-with-mnist" id="markdown-toc-experience-with-mnist">Experience with MNIST</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#resources" id="markdown-toc-resources">Resources</a></li>
+</ul>
+
+<hr />
+
+<h2 id="triplet-loss-and-triplet-mining">Triplet loss and triplet mining</h2>
+
+<h3 id="why-not-just-use-softmax">Why not just use softmax?</h3>
+
+<p>The triplet loss for face recognition has been introduced by the paper <a href="https://arxiv.org/abs/1503.03832"><em>FaceNet: A Unified Embedding for Face Recognition and Clustering</em></a> from Google.
+They describe a new approach to train face embeddings using online triplet mining, which will be discussed in the <a href="#offline-and-online-triplet-mining">next section</a>.</p>
+
+<p>Usually in supervised learning we have a fixed number of classes and train the network using the softmax cross entropy loss.
+However in some cases we need to be able to have a variable number of classes.
+In face recognition for instance, we need to be able to compare two unknown faces and say whether they are from the same person or not.</p>
+
+<p>Triplet loss in this case is a way to learn good embeddings for each face. In the embedding space, faces from the same person should be close together and form well separated clusters.</p>
+
+<h3 id="definition-of-the-loss">Definition of the loss</h3>
+
+<p><img src="assets/triplet_loss/triplet_loss.png" alt="triplet-loss-img" /></p>
+<center><i>Triplet loss on two positive faces (Obama) and one negative face (Macron)</i></center>
+
+<p><br /></p>
+
+<p>The goal of the triplet loss is to make sure that:</p>
+<ul>
+  <li>Two examples with the same label have their embeddings close together in the embedding space</li>
+  <li>Two examples with different labels have their embeddings far away.</li>
+</ul>
+
+<p>However, we don’t want to push the train embeddings of each label to collapse into very small clusters.
+The only requirement is that given two positive examples of the same class and one negative example, the negative should be farther away than the positive by some margin.
+This is very similar to the margin used in SVMs, and here we want the clusters of each class to be separated by the margin.</p>
+
+<p><br />
+To formalise this requirement, the loss will be defined over <strong>triplets</strong> of embeddings:</p>
+<ul>
+  <li>an <strong>anchor</strong></li>
+  <li>a <strong>positive</strong> of the same class as the anchor</li>
+  <li>a <strong>negative</strong> of a different class</li>
+</ul>
+
+<p>For some distance on the embedding space $d$,  the loss of a triplet $(a, p, n)$ is:</p>
+
+\[\mathcal{L} = max(d(a, p) - d(a, n) + margin, 0)\]
+
+<p>We minimize this loss, which pushes $d(a, p)$ to $0$ and $d(a, n)$ to be greater than $d(a, p) + margin$. As soon as $n$ becomes an “easy negative”, the loss becomes zero.</p>
+
+<h3 id="triplet-mining">Triplet mining</h3>
+
+<p>Based on the definition of the loss, there are three categories of triplets:</p>
+<ul>
+  <li><strong>easy triplets</strong>: triplets which have a loss of $0$, because $d(a, p) + margin &lt; d(a,n)$</li>
+  <li><strong>hard triplets</strong>: triplets where the negative is closer to the anchor than the positive, i.e. $d(a,n) &lt; d(a,p)$</li>
+  <li><strong>semi-hard triplets</strong>: triplets where the negative is not closer to the anchor than the positive, but which still have positive loss: $d(a, p) &lt; d(a, n) &lt; d(a, p) + margin$</li>
+</ul>
+
+<p>Each of these definitions depend on where the negative is, relatively to the anchor and positive. We can therefore extend these three categories to the negatives: <strong>hard negatives</strong>, <strong>semi-hard negatives</strong> or <strong>easy negatives</strong>.</p>
+
+<p>The figure below shows the three corresponding regions of the embedding space for the negative.</p>
+
+<p><img src="assets/triplet_loss/triplets.png" alt="triplet-types-img" /></p>
+<center><i>The three types of negatives, given an anchor and a positive</i></center>
+
+<p><br />
+Choosing what kind of triplets we want to train on will greatly impact our metrics.
+In the original Facenet <a href="https://arxiv.org/abs/1503.03832">paper</a>, they pick a random semi-hard negative for every pair of anchor and positive, and train on these triplets.</p>
+
+<h3 id="offline-and-online-triplet-mining">Offline and online triplet mining</h3>
+
+<p>We have defined a loss on triplets of embeddings, and have seen that some triplets are more useful than others. The question now is how to sample, or “mine” these triplets.</p>
+
+<p><strong>Offline triplet mining</strong></p>
+
+<p>The first way to produce triplets is to find them offline, at the beginning of each epoch for instance.
+We compute all the embeddings on the training set, and then only select hard or semi-hard triplets.
+We can then train one epoch on these triplets.</p>
+
+<p>Concretely, we would produce a list of triplets $(i, j, k)$.
+We would then create batches of these triplets of size $B$, which means we will have to compute $3B$ embeddings to get the $B$ triplets, compute the loss of these $B$ triplets and then backpropagate into the network.</p>
+
+<p>Overall this technique is not very efficient since we need to do a full pass on the training set to generate triplets.
+It also requires to update the offline mined triplets regularly.</p>
+
+<p><strong>Online triplet mining</strong></p>
+
+<p>Online triplet mining was introduced in <em>Facenet</em> and has been well described by Brandon Amos in his blog post <a href="http://bamos.github.io/2016/01/19/openface-0.2.0/"><em>OpenFace 0.2.0: Higher accuracy and halved execution time</em></a>.</p>
+
+<p>The idea here is to compute useful triplets on the fly, for each batch of inputs.
+Given a batch of $B$ examples (for instance $B$ images of faces), we compute the $B$ embeddings and we then can find a maximum of $B^3$ triplets.
+Of course, most of these triplets are not <strong>valid</strong> (i.e. they don’t have 2 positives and 1 negative).</p>
+
+<p>This technique gives you more triplets for a single batch of inputs, and doesn’t require any offline mining. It is therefore much more efficient. We will see an implementation of this in the last <a href="#a-better-implementation-with-online-triplet-mining">part</a>.</p>
+
+<p><img src="assets/triplet_loss/online_triplet_loss.png" alt="online-triplet-loss-img" /></p>
+<center><i>Triplet loss with online mining: triplets are computed on the fly from a batch of embeddings</i></center>
+
+<p><br /></p>
+
+<h3 id="strategies-in-online-mining">Strategies in online mining</h3>
+
+<p>In online mining, we have computed a batch of $B$ embeddings from a batch of $B$ inputs.
+Now we want to generate triplets from these $B$ embeddings.</p>
+
+<p>Whenever we have three indices $i, j, k \in [1, B]$, if examples $i$ and $j$ have the same label but are distinct, and example $k$ has a different label, we say that <strong>$(i, j, k)$ is a valid triplet</strong>.
+What remains here is to have a good strategy to pick triplets among the valid ones on which to compute the loss.</p>
+
+<p>A detailed explanation of two of these strategies can be found in section 2 of the paper <a href="https://arxiv.org/abs/1703.07737"><em>In Defense of the Triplet Loss for Person Re-Identification</em></a>.</p>
+
+<p>They suppose that you have a batch of faces as input of size $B = PK$, composed of $P$ different persons with $K$ images each.
+A typical value is $K = 4$.
+The two strategies are:</p>
+<ul>
+  <li><strong>batch all</strong>: select all the valid triplets, and average the loss on the hard and semi-hard triplets.
+    <ul>
+      <li>a crucial point here is to not take into account the easy triplets (those with loss $0$), as averaging on them would make the overall loss very small</li>
+      <li>this produces a total of $PK(K-1)(PK-K)$ triplets ($PK$ anchors, $K-1$ possible positives per anchor, $PK-K$ possible negatives)</li>
+    </ul>
+  </li>
+  <li><strong>batch hard</strong>: for each anchor, select the hardest positive (biggest distance $d(a, p)$) and the hardest negative among the batch
+    <ul>
+      <li>this produces $PK$ triplets</li>
+      <li>the selected triplets are the hardest among the batch</li>
+    </ul>
+  </li>
+</ul>
+
+<p>According to the <a href="https://arxiv.org/abs/1703.07737">paper</a> cited above, the batch hard strategy yields the best performance:</p>
+<blockquote>
+  <p>Additionally, the selected triplets can be considered moderate triplets, since they are the hardest within a small subset of the data, which is exactly what is best for learning with the triplet loss.</p>
+</blockquote>
+
+<p>However it really depends on your dataset and should be decided by comparing performance on the dev set.</p>
+
+<hr />
+
+<h2 id="a-naive-implementation-of-triplet-loss">A naive implementation of triplet loss</h2>
+
+<p>In the <a href="https://stackoverflow.com/a/38270293/5098368">stackoverflow answer</a>, I gave a simple implementation of triplet loss for offline triplet mining:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">anchor_output</span> <span class="o">=</span> <span class="p">...</span>    <span class="c1"># shape [None, 128]
+</span><span class="n">positive_output</span> <span class="o">=</span> <span class="p">...</span>  <span class="c1"># shape [None, 128]
+</span><span class="n">negative_output</span> <span class="o">=</span> <span class="p">...</span>  <span class="c1"># shape [None, 128]
+</span>
+<span class="n">d_pos</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_sum</span><span class="p">(</span><span class="n">tf</span><span class="p">.</span><span class="n">square</span><span class="p">(</span><span class="n">anchor_output</span> <span class="o">-</span> <span class="n">positive_output</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">d_neg</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_sum</span><span class="p">(</span><span class="n">tf</span><span class="p">.</span><span class="n">square</span><span class="p">(</span><span class="n">anchor_output</span> <span class="o">-</span> <span class="n">negative_output</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="n">loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">margin</span> <span class="o">+</span> <span class="n">d_pos</span> <span class="o">-</span> <span class="n">d_neg</span><span class="p">)</span>
+<span class="n">loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_mean</span><span class="p">(</span><span class="n">loss</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>The network is replicated three times (with shared weights) to produce the embeddings of $B$ anchors, $B$ positives and $B$ negatives.
+We then simply compute the triplet loss on these embeddings.</p>
+
+<p>This is an easy implementation, but also a very inefficient one because it uses offline triplet mining.</p>
+
+<hr />
+
+<h2 id="a-better-implementation-with-online-triplet-mining">A better implementation with online triplet mining</h2>
+
+<p>All the relevant code is available on github in <a href="https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py"><code class="language-plaintext highlighter-rouge">model/triplet_loss.py</code></a>.</p>
+
+<p><em>There is an existing implementation of triplet loss with semi-hard online mining in TensorFlow: <a href="https://www.tensorflow.org/api_docs/python/tf/contrib/losses/metric_learning/triplet_semihard_loss"><code class="language-plaintext highlighter-rouge">tf.contrib.losses.metric_learning.triplet_semihard_loss</code></a>.
+Here we will not follow this implementation and start from scratch.</em></p>
+
+<h3 id="compute-the-distance-matrix">Compute the distance matrix</h3>
+
+<p>As the final triplet loss depends on the distances $d(a, p)$ and $d(a, n)$, we first need to <em>efficiently</em> compute the pairwise distance matrix.
+We implement this for the euclidean norm and the squared euclidean norm, in the <code class="language-plaintext highlighter-rouge">_pairwise_distances</code> function:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">_pairwise_distances</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">squared</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="s">"""Compute the 2D matrix of distances between all the embeddings.
+
+    Args:
+        embeddings: tensor of shape (batch_size, embed_dim)
+        squared: Boolean. If true, output is the pairwise squared euclidean distance matrix.
+                 If false, output is the pairwise euclidean distance matrix.
+
+    Returns:
+        pairwise_distances: tensor of shape (batch_size, batch_size)
+    """</span>
+    <span class="c1"># Get the dot product between all embeddings
+</span>    <span class="c1"># shape (batch_size, batch_size)
+</span>    <span class="n">dot_product</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">tf</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">embeddings</span><span class="p">))</span>
+
+    <span class="c1"># Get squared L2 norm for each embedding. We can just take the diagonal of `dot_product`.
+</span>    <span class="c1"># This also provides more numerical stability (the diagonal of the result will be exactly 0).
+</span>    <span class="c1"># shape (batch_size,)
+</span>    <span class="n">square_norm</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">diag_part</span><span class="p">(</span><span class="n">dot_product</span><span class="p">)</span>
+
+    <span class="c1"># Compute the pairwise distance matrix as we have:
+</span>    <span class="c1"># ||a - b||^2 = ||a||^2  - 2 &lt;a, b&gt; + ||b||^2
+</span>    <span class="c1"># shape (batch_size, batch_size)
+</span>    <span class="n">distances</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">square_norm</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">dot_product</span> <span class="o">+</span> <span class="n">tf</span><span class="p">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">square_norm</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Because of computation errors, some distances might be negative so we put everything &gt;= 0.0
+</span>    <span class="n">distances</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">distances</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">squared</span><span class="p">:</span>
+        <span class="c1"># Because the gradient of sqrt is infinite when distances == 0.0 (ex: on the diagonal)
+</span>        <span class="c1"># we need to add a small epsilon where distances == 0.0
+</span>        <span class="n">mask</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">to_float</span><span class="p">(</span><span class="n">tf</span><span class="p">.</span><span class="n">equal</span><span class="p">(</span><span class="n">distances</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span> <span class="o">+</span> <span class="n">mask</span> <span class="o">*</span> <span class="mf">1e-16</span>
+
+        <span class="n">distances</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">distances</span><span class="p">)</span>
+
+        <span class="c1"># Correct the epsilon added: set the distances on the mask to be exactly 0.0
+</span>        <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">mask</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">distances</span>
+</code></pre></div></div>
+
+<p>To explain the code in more details, we compute the dot product between embeddings which will have shape $(B, B)$.
+The squared euclidean norm of each embedding is actually contained in the diagonal of this dot product so we extract it with <code class="language-plaintext highlighter-rouge">tf.diag_part</code>.
+Finally we compute the distance using the formula:</p>
+
+\[\Vert a - b \Vert ^2 = \Vert a \Vert^2 - 2 \langle a, b \rangle + \Vert b \Vert ^2\]
+
+<p>One tricky thing is that if <code class="language-plaintext highlighter-rouge">squared=False</code>, we take the square root of the distance matrix.
+First we have to ensure that the distance matrix is always positive.
+Some values could be negative because of small inaccuracies in computation.
+We just make sure that every negative value gets set to <code class="language-plaintext highlighter-rouge">0.0</code>.</p>
+
+<p>The second thing to take care of is that if any element is exactly <code class="language-plaintext highlighter-rouge">0.0</code> (the diagonal should always be <code class="language-plaintext highlighter-rouge">0.0</code> for instance), as the derivative of the square root is infinite in $0$, we will have a <code class="language-plaintext highlighter-rouge">nan</code> gradient.
+To handle this case, we replace values equal to <code class="language-plaintext highlighter-rouge">0.0</code> with a small <code class="language-plaintext highlighter-rouge">epsilon = 1e-16</code>.
+We then take the square root, and replace the values $\sqrt{\epsilon}$  with <code class="language-plaintext highlighter-rouge">0.0</code>.</p>
+
+<h3 id="batch-all-strategy">Batch all strategy</h3>
+
+<p>In this strategy, we want to compute the triplet loss on almost all triplets.
+In the TensorFlow graph, we want to create a 3D tensor of shape $(B, B, B)$ where the element at index $(i, j, k)$ contains the loss for triplet $(i, j, k)$.</p>
+
+<p>We then get a 3D mask of the valid triplets with function <code class="language-plaintext highlighter-rouge">_get_triplet_mask</code>.
+Here, <code class="language-plaintext highlighter-rouge">mask[i, j, k]</code> is true iff $(i, j, k)$ is a valid triplet.</p>
+
+<p>Finally, we set to $0$ the loss of the invalid triplets and take the average over the positive triplets.</p>
+
+<p>Everything is implemented in function <code class="language-plaintext highlighter-rouge">batch_all_triplet_loss</code>:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">batch_all_triplet_loss</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">margin</span><span class="p">,</span> <span class="n">squared</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="s">"""Build the triplet loss over a batch of embeddings.
+
+    We generate all the valid triplets and average the loss over the positive ones.
+
+    Args:
+        labels: labels of the batch, of size (batch_size,)
+        embeddings: tensor of shape (batch_size, embed_dim)
+        margin: margin for triplet loss
+        squared: Boolean. If true, output is the pairwise squared euclidean distance matrix.
+                 If false, output is the pairwise euclidean distance matrix.
+
+    Returns:
+        triplet_loss: scalar tensor containing the triplet loss
+    """</span>
+    <span class="c1"># Get the pairwise distance matrix
+</span>    <span class="n">pairwise_dist</span> <span class="o">=</span> <span class="n">_pairwise_distances</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">squared</span><span class="o">=</span><span class="n">squared</span><span class="p">)</span>
+
+    <span class="n">anchor_positive_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">pairwise_dist</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">anchor_negative_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">pairwise_dist</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Compute a 3D tensor of size (batch_size, batch_size, batch_size)
+</span>    <span class="c1"># triplet_loss[i, j, k] will contain the triplet loss of anchor=i, positive=j, negative=k
+</span>    <span class="c1"># Uses broadcasting where the 1st argument has shape (batch_size, batch_size, 1)
+</span>    <span class="c1"># and the 2nd (batch_size, 1, batch_size)
+</span>    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">anchor_positive_dist</span> <span class="o">-</span> <span class="n">anchor_negative_dist</span> <span class="o">+</span> <span class="n">margin</span>
+
+    <span class="c1"># Put to zero the invalid triplets
+</span>    <span class="c1"># (where label(a) != label(p) or label(n) == label(a) or a == p)
+</span>    <span class="n">mask</span> <span class="o">=</span> <span class="n">_get_triplet_mask</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">to_float</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">triplet_loss</span><span class="p">)</span>
+
+    <span class="c1"># Remove negative losses (i.e. the easy triplets)
+</span>    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">triplet_loss</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="c1"># Count number of positive triplets (where triplet_loss &gt; 0)
+</span>    <span class="n">valid_triplets</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">to_float</span><span class="p">(</span><span class="n">tf</span><span class="p">.</span><span class="n">greater</span><span class="p">(</span><span class="n">triplet_loss</span><span class="p">,</span> <span class="mf">1e-16</span><span class="p">))</span>
+    <span class="n">num_positive_triplets</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_sum</span><span class="p">(</span><span class="n">valid_triplets</span><span class="p">)</span>
+    <span class="n">num_valid_triplets</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_sum</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+    <span class="n">fraction_positive_triplets</span> <span class="o">=</span> <span class="n">num_positive_triplets</span> <span class="o">/</span> <span class="p">(</span><span class="n">num_valid_triplets</span> <span class="o">+</span> <span class="mf">1e-16</span><span class="p">)</span>
+
+    <span class="c1"># Get final mean triplet loss over the positive valid triplets
+</span>    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_sum</span><span class="p">(</span><span class="n">triplet_loss</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">num_positive_triplets</span> <span class="o">+</span> <span class="mf">1e-16</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">triplet_loss</span><span class="p">,</span> <span class="n">fraction_positive_triplets</span>
+</code></pre></div></div>
+
+<p>The implementation of <code class="language-plaintext highlighter-rouge">_get_triplet_mask</code> is straightforward, so I will not detail it.</p>
+
+<h3 id="batch-hard-strategy">Batch hard strategy</h3>
+
+<p>In this strategy, we want to find the hardest positive and negative for each anchor.</p>
+
+<p><strong>Hardest positive</strong></p>
+
+<p>To compute the hardest positive, we begin with the pairwise distance matrix.
+We then get a 2D mask of the valid pairs $(a, p)$ (i.e. $a \neq p$ and $a$ and $p$ have same labels) and put to $0$ any element outside of the mask.</p>
+
+<p>The last step is just to take the maximum distance over each row of this modified distance matrix. The result should be a valid pair $(a, p)$ since invalid elements are set to $0$.</p>
+
+<p><strong>Hardest negative</strong></p>
+
+<p>The hardest negative is similar but a bit trickier to compute.
+Here we need to get the minimum distance for each row, so we cannot set to $0$ the invalid pairs $(a, n)$ (invalid if $a$ and $n$ have the same label).</p>
+
+<p>Our trick here is for each row to add the maximum value to the invalid pairs $(a, n)$.
+We then take the minimum over each row.
+The result should be a valid pair $(a, n)$ since invalid elements are set to the maximum value.</p>
+
+<p><br />
+The final step is to combine these into the triplet loss:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">hardest_positive_dist</span> <span class="o">-</span> <span class="n">hardest_negative_dist</span> <span class="o">+</span> <span class="n">margin</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Everything is implemented in function <code class="language-plaintext highlighter-rouge">batch_hard_triplet_loss</code>:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">batch_hard_triplet_loss</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">margin</span><span class="p">,</span> <span class="n">squared</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="s">"""Build the triplet loss over a batch of embeddings.
+
+    For each anchor, we get the hardest positive and hardest negative to form a triplet.
+
+    Args:
+        labels: labels of the batch, of size (batch_size,)
+        embeddings: tensor of shape (batch_size, embed_dim)
+        margin: margin for triplet loss
+        squared: Boolean. If true, output is the pairwise squared euclidean distance matrix.
+                 If false, output is the pairwise euclidean distance matrix.
+
+    Returns:
+        triplet_loss: scalar tensor containing the triplet loss
+    """</span>
+    <span class="c1"># Get the pairwise distance matrix
+</span>    <span class="n">pairwise_dist</span> <span class="o">=</span> <span class="n">_pairwise_distances</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">squared</span><span class="o">=</span><span class="n">squared</span><span class="p">)</span>
+
+    <span class="c1"># For each anchor, get the hardest positive
+</span>    <span class="c1"># First, we need to get a mask for every valid positive (they should have same label)
+</span>    <span class="n">mask_anchor_positive</span> <span class="o">=</span> <span class="n">_get_anchor_positive_triplet_mask</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+    <span class="n">mask_anchor_positive</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">to_float</span><span class="p">(</span><span class="n">mask_anchor_positive</span><span class="p">)</span>
+
+    <span class="c1"># We put to 0 any element where (a, p) is not valid (valid if a != p and label(a) == label(p))
+</span>    <span class="n">anchor_positive_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">mask_anchor_positive</span><span class="p">,</span> <span class="n">pairwise_dist</span><span class="p">)</span>
+
+    <span class="c1"># shape (batch_size, 1)
+</span>    <span class="n">hardest_positive_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_max</span><span class="p">(</span><span class="n">anchor_positive_dist</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="c1"># For each anchor, get the hardest negative
+</span>    <span class="c1"># First, we need to get a mask for every valid negative (they should have different labels)
+</span>    <span class="n">mask_anchor_negative</span> <span class="o">=</span> <span class="n">_get_anchor_negative_triplet_mask</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+    <span class="n">mask_anchor_negative</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">to_float</span><span class="p">(</span><span class="n">mask_anchor_negative</span><span class="p">)</span>
+
+    <span class="c1"># We add the maximum value in each row to the invalid negatives (label(a) == label(n))
+</span>    <span class="n">max_anchor_negative_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_max</span><span class="p">(</span><span class="n">pairwise_dist</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">anchor_negative_dist</span> <span class="o">=</span> <span class="n">pairwise_dist</span> <span class="o">+</span> <span class="n">max_anchor_negative_dist</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">mask_anchor_negative</span><span class="p">)</span>
+
+    <span class="c1"># shape (batch_size,)
+</span>    <span class="n">hardest_negative_dist</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_min</span><span class="p">(</span><span class="n">anchor_negative_dist</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="c1"># Combine biggest d(a, p) and smallest d(a, n) into final triplet loss
+</span>    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">hardest_positive_dist</span> <span class="o">-</span> <span class="n">hardest_negative_dist</span> <span class="o">+</span> <span class="n">margin</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="c1"># Get final mean triplet loss
+</span>    <span class="n">triplet_loss</span> <span class="o">=</span> <span class="n">tf</span><span class="p">.</span><span class="n">reduce_mean</span><span class="p">(</span><span class="n">triplet_loss</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">triplet_loss</span>
+</code></pre></div></div>
+
+<h3 id="testing-our-implementation">Testing our implementation</h3>
+
+<p>If you don’t trust that the implementation above works as expected, then you’re right!
+The only way to make sure that there is no bug in the implementation is to write tests for every function in <a href="https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py"><code class="language-plaintext highlighter-rouge">model/triplet_loss.py</code></a></p>
+
+<p>This is especially important for tricky functions like this that are difficult to implement in TensorFlow but much easier to write using three nested for loops in python for instance.
+The tests are written in <a href="https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/tests/test_triplet_loss.py"><code class="language-plaintext highlighter-rouge">model/tests/test_triplet_loss.py</code></a>, and compare the result of our TensorFlow implementation with the results of a simple numpy implementation.</p>
+
+<p>To check yourself that the tests pass, run:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pytest model/tests/test_triplet_loss.py
+</code></pre></div></div>
+<p>(or just <code class="language-plaintext highlighter-rouge">pytest</code>)</p>
+
+<p>Here is a list of the tests performed:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">test_pairwise_distances()</code>: compare results of numpy of tensorflow for pairwise distance</li>
+  <li><code class="language-plaintext highlighter-rouge">test_pairwise_distances_are_positive()</code>: make sure that the resulting distance is positive</li>
+  <li><code class="language-plaintext highlighter-rouge">test_gradients_pairwise_distances()</code>:  make sure that the gradients are not <code class="language-plaintext highlighter-rouge">nan</code></li>
+  <li><code class="language-plaintext highlighter-rouge">test_triplet_mask()</code>: compare numpy and tensorflow implementations</li>
+  <li><code class="language-plaintext highlighter-rouge">test_anchor_positive_triplet_mask()</code>: compare numpy and tensorflow implementations</li>
+  <li><code class="language-plaintext highlighter-rouge">test_anchor_negative_triplet_mask()</code>: compare numpy and tensorflow implementations</li>
+  <li><code class="language-plaintext highlighter-rouge">test_simple_batch_all_triplet_loss()</code>: simple test where there is just one type of label</li>
+  <li><code class="language-plaintext highlighter-rouge">test_batch_all_triplet_loss()</code>: full test of batch all strategy (compares with numpy)</li>
+  <li><code class="language-plaintext highlighter-rouge">test_batch_hard_triplet_loss()</code>: full test of batch hard strategy (compares with numpy)</li>
+</ul>
+
+<p><br /></p>
+
+<hr />
+
+<h2 id="experience-with-mnist">Experience with MNIST</h2>
+
+<p>Even with the tests above, it is easy to oversee some mistakes.
+For instance, at first I implemented the pairwise distance without checking that the input to the square root was strictly greater than $0$.
+All the tests I had passed but the gradients during training were immediately <code class="language-plaintext highlighter-rouge">nan</code>.
+I therefore added <code class="language-plaintext highlighter-rouge">test_gradients_pairwise_distances</code>, and corrected the <code class="language-plaintext highlighter-rouge">_pairwise_distances</code> function.</p>
+
+<p>To make things simple, we will test the triplet loss on MNIST.
+The code can be found <a href="https://github.com/omoindrot/tensorflow-triplet-loss">here</a>.</p>
+
+<p>To train and evaluate the model, do:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python train.py <span class="nt">--model_dir</span> experiments/base_model
+</code></pre></div></div>
+
+<p>This will launch a new experiment (i.e. a training run) named <code class="language-plaintext highlighter-rouge">base_model</code>.
+The model directory (containing weights, summaries…) is located in <code class="language-plaintext highlighter-rouge">experiments/base_model</code>.
+Here we use a json file <code class="language-plaintext highlighter-rouge">experiments/base_model/params.json</code> that specifies all the hyperparameters in the model.
+This file must be created for any new experiment.</p>
+
+<p>Once training is complete (or as soon as some weights are saved in the model directory), we can visualize the embeddings using TensorBoard.
+To do this, run:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python visualize_embeddings.py <span class="nt">--model_dir</span> experiments/base_model
+</code></pre></div></div>
+
+<p>And run TensorBoard in the experiment directory:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tensorboard <span class="nt">--logdir</span> experiments/base_model
+</code></pre></div></div>
+
+<p align="center">
+<img src="assets/triplet_loss/embeddings.gif" />
+</p>
+
+<p align="center">
+<i>Embeddings of the MNIST test images visualized with T-SNE (perplexity 25)</i>
+</p>
+
+<p><br /></p>
+
+<p>These embeddings were run with the hyperparameters specified in the configuration file <a href="https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/experiments/base_model/params.json"><code class="language-plaintext highlighter-rouge">experiments/base_model/params.json</code></a>.
+It’s pretty interesting to see which evaluation images get misclassified: a lot of them would surely be mistaken by humans too.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>TensorFlow doesn’t make it easy to implement triplet loss, but with a bit of effort we can build a good-looking version of triplet loss with online mining.</p>
+
+<p>The tricky part is mostly how to compute efficiently the distances between embeddings, and how to mask out the invalid / easy triplets.</p>
+
+<p>Finally if you need to remember one thing: <strong>always test your code</strong>, especially when it’s complex like triplet loss.</p>
+
+<h2 id="resources">Resources</h2>
+
+<ul>
+  <li><a href="https://github.com/omoindrot/tensorflow-triplet-loss">Github repo</a> for this blog post</li>
+  <li><a href="https://arxiv.org/abs/1503.03832">Facenet paper</a> introducing online triplet mining</li>
+  <li>Detailed explanation of online triplet mining in <a href="https://arxiv.org/abs/1703.07737"><em>In Defense of the Triplet Loss for Person Re-Identification</em></a></li>
+  <li>Blog post by Brandon Amos on online triplet mining: <a href="http://bamos.github.io/2016/01/19/openface-0.2.0/"><em>OpenFace 0.2.0: Higher accuracy and halved execution time</em></a>.</li>
+  <li>Source code for the built-in TensorFlow function for semi hard online mining triplet loss: <a href="https://www.tensorflow.org/api_docs/python/tf/contrib/losses/metric_learning/triplet_semihard_loss"><code class="language-plaintext highlighter-rouge">tf.contrib.losses.metric_learning.triplet_semihard_loss</code></a>.</li>
+  <li>The <a href="https://www.coursera.org/learn/convolutional-neural-networks/lecture/HuUtN/triplet-loss">coursera lecture</a> on triplet loss</li>
+</ul>

@@ -1,0 +1,7 @@
+# lib itself: none
+
+# dev
+pytest
+
+# __main__
+lxml
