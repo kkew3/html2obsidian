@@ -1580,8 +1580,15 @@ class StackMarkdownGenerator:
                         return [e1, Newline()]
                 return None
 
-        res = stack_merge(res,
-                          insert_headline_and_one_newline_between_row_rule())
+        res2 = stack_merge(res,
+                           insert_headline_and_one_newline_between_row_rule())
+        if res2 != res:
+            res = res2
+        else:
+            res.append(Newline())
+            headerline = ('|' + '|'.join('---' for _ in range(n_cells)) + '|')
+            res.append(headerline)
+            
         res = [e for e in res if not isinstance(e, MdTableRow)]
         res.append(LineBreak())
         return as_text(res, 'pass')

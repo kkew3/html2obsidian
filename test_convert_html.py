@@ -204,6 +204,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('table')
         assert g.generate() == md
 
+    def test_table_one_row(self):
+        g, md = self._case('table_one_row')
+        assert g.generate() == md
+
     def test_img(self):
         g, md = self._case('img')
         assert g.generate() == md
