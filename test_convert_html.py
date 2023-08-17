@@ -196,6 +196,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('mixed_ul_escape')
         assert g.generate() == md
 
+    def test_ul_star_bullet(self):
+        g, md = self._case('ul_star_bullet', {'ul_bullet': '*'})
+        assert g.generate() == md
+
     def test_table(self):
         g, md = self._case('table')
         assert g.generate() == md

@@ -1197,10 +1197,17 @@ class StackMarkdownGenerator:
         if contains_unparsed_element(elements):
             return None
         res = as_text(elements, 'pass')
-        res = [
-            '{} '.format(self.options['ul_bullet']) if isinstance(
-                e, MdListItemBullet) else e for e in res
-        ]
+
+        bullet_char = self.options['ul_bullet']
+        if bullet_char not in ['-', '*', '+']:
+            raise ValueError('invalid <ul> bullet: {}'.format(bullet_char))
+
+        def sub_ul_bullet_rule(e1, e2):
+            if isinstance(e2, MdListItemBullet):
+                return [e1, VerbText(bullet_char), Space()]
+            return None
+
+        res = stack_merge(res, sub_ul_bullet_rule)
 
         stop_on_mdlist = functools.partial(stop_merging_on_seen, MdList())
 
