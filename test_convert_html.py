@@ -220,6 +220,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('math')
         assert g.generate() == md
 
+    def test_cycle1(self):
+        g, md = self._case('cycle1')
+        assert g.generate() == md
+
     def test_space_in_dollar_inline_math(self):
         g, md = self._case('space_in_dollar_inline_math')
         assert g.generate() == md

@@ -115,7 +115,10 @@ class KeepOnlySupportedTarget:
             self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
             self.stack.append(tag)
         # lists
-        elif tag in ['ul', 'li']:
+        elif tag == 'li':
+            self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
+            self.stack.append(tag)
+        elif tag == 'ul':
             self.nodes.append(StartElement(tag))
             self.stack.append(tag)
         elif tag == 'ol':
@@ -655,10 +658,55 @@ def recognize_merge_whitespace(
     return res4
 
 
-IntermediateElementType = ty.Union[SupportedElementType, PhantomElement,
-                                   VerbText, Whitespace]
+class LocalHref:
+    """
+    Represents the text part of an <a> tag referencing a within-document
+    location.
+    """
+    __slots__ = ['elements', 'href', 'ref']
 
-OutcomeElementType = ty.Union[str, VerbText, Whitespace]
+    def __init__(self, elements: ty.List[ty.Union[str, VerbText, Whitespace]],
+                 href: str):
+        """
+        :param elements: children elements
+        :param the href without the leading '#'
+        """
+        self.elements = elements
+        self.href = href
+        self.ref = None
+
+    def __repr__(self):
+        return '{}(href={!r}, ref={!r}, elements={!r})'.format(
+            type(self).__name__, self.href, self.ref, self.elements)
+
+    def as_text(self):
+        if self.ref is None:
+            raise ValueError('self.ref is None')
+        res = ['[[#', self.ref, '|']
+        res.extend(self.elements)
+        res.append(']]')
+        return res
+
+
+IntermediateElementType = ty.Union[SupportedElementType, PhantomElement,
+                                   VerbText, Whitespace, LocalHref]
+
+
+def resolve_local_hrefs(
+    elements: ty.List[IntermediateElementType],
+    ref_context: ty.Dict[str, ty.Dict[str, str]],
+) -> None:
+    """Resolve ``LocalHref``s inplace."""
+    for e in elements:
+        if isinstance(e, LocalHref):
+            try:
+                ctx = ref_context[e.href]
+                if ctx['type'] == 'header':
+                    e.ref = ctx['ref']
+                else:
+                    e.ref = '^' + ctx['ref']
+            except KeyError:
+                pass
 
 
 def escape(text: str) -> str:
@@ -674,6 +722,7 @@ def as_text(
     phantom_policy: ty.Literal['pass', 'ignore', 'warn', 'raise'],
     tag_policy: ty.Literal['pass', 'raise'] = 'raise',
     merge_whitespace: bool = True,
+    eval_local_href: ty.Literal['elements', 'text'] = False,
     eval_whitespace: bool = False,
     escape_text: bool = False,
     eval_verb: bool = False,
@@ -685,7 +734,11 @@ def as_text(
     :param merge_whitespace: if ``True``, successive linebreaks are
            substituted by one single ``LineBreak``, and then remaining
            successive whitespace characters are substituded by one ``Space``
-    :param eval_whitespace: if ``True``, evaluate ``Whitespace`` after merging
+    :param eval_local_href: if 'text', evaluate ``LocalHref`` to text; if
+           'elements', evaluate it to its children elements; if ``False``,
+           don't evaluate it
+    :param eval_whitespace: if ``True``, evaluate ``Whitespace`` after
+           evaluating ``LocalHref``
     :param escape_text: if ``True``, escape non-``VerbText`` text after
            evaluating whitespace
     :param eval_verb: also evaluate ``VerbText`` to ``str`` after escaping
@@ -695,7 +748,7 @@ def as_text(
     # escape and type check
     res1 = []
     for e in elements:
-        if isinstance(e, (str, VerbText, Whitespace)):
+        if isinstance(e, (str, VerbText, Whitespace, LocalHref)):
             res1.append(e)
         elif isinstance(e, PhantomElement):
             if phantom_policy == 'pass':
@@ -737,6 +790,27 @@ def as_text(
         res3 = stack_merge(res2, merge_whitespace_rule)
     else:
         res3 = res2.copy()
+    if eval_local_href == 'text':
+        res3_2 = res3.copy()
+        res3.clear()
+        for e in res3_2:
+            if isinstance(e, LocalHref):
+                res3.extend(e.as_text())
+            else:
+                res3.append(e)
+        del res3_2
+    elif eval_local_href == 'elements':
+        res3_2 = res3.copy()
+        res3.clear()
+        for e in res3_2:
+            if isinstance(e, LocalHref):
+                res3.extend(e.elements)
+            else:
+                res3.append(e)
+        del res3_2
+    elif eval_local_href:
+        raise ValueError(
+            'invalid eval_local_href value: {}'.format(eval_local_href))
     if eval_whitespace:
         res3 = [str(e) if isinstance(e, Whitespace) else e for e in res3]
     if escape_text:
@@ -758,9 +832,11 @@ def check_converged(elements: ty.List[IntermediateElementType]) -> bool:
     Returns ``True`` when ``elements`` only consists of ``str``,
     ``VerbTect`` and ``Whitespace``.
     """
-    return all(
-        isinstance(e, (str, VerbText, Whitespace, PhantomElement))
-        for e in elements)
+    for e in elements:
+        if not (isinstance(e, (str, VerbText, Whitespace, PhantomElement)) or
+                (isinstance(e, LocalHref) and e.ref is not None)):
+            return False
+    return True
 
 
 def contains_unparsed_element(
@@ -888,6 +964,7 @@ class StackMarkdownGenerator:
                     res1.append(e)
 
             self.stack = as_text(res1, 'pass', 'pass')
+            resolve_local_hrefs(self.stack, self.ref_context)
             n_loop += 1
 
         # if requested, make header levels as high as possible
@@ -921,6 +998,7 @@ class StackMarkdownGenerator:
             as_text(
                 self.stack,
                 phantom_policy='warn',
+                eval_local_href='text',
                 eval_whitespace=True,
                 escape_text=True,
                 eval_verb=True))
@@ -954,7 +1032,7 @@ class StackMarkdownGenerator:
         _attrib: ty.Dict[str, str],
         elements: ty.List[IntermediateElementType],
         _parents: ty.List[StartElement],
-    ) -> ty.Optional[ty.List[OutcomeElementType]]:
+    ) -> ty.Optional[ty.List[ty.Union[str, VerbText, Whitespace]]]:
         """
         May contain::
 
@@ -971,6 +1049,7 @@ class StackMarkdownGenerator:
                 as_text(
                     res,
                     phantom_policy='warn',
+                    eval_local_href='elements',
                     eval_whitespace=True,
                     eval_verb=True)))
             for a in anchors:
@@ -1023,26 +1102,21 @@ class StackMarkdownGenerator:
 
         res, anchors = collect_phantom(res, Anchor)
         res.append(LineBreak())
-        if 'id' in attrib:
+        if 'id' in attrib or anchors:
             ref = ''.join(
                 as_text(
                     res[2:-1],
                     phantom_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True))
-            self.ref_context[attrib['id']] = {
-                'type': 'header',
-                'ref': ref,
-            }
-        if anchors:
-            ref = ''.join(
-                as_text(
-                    res[2:-1],
-                    phantom_policy='ignore',
+                    eval_local_href='elements',
                     eval_whitespace=True,
                     eval_verb=True))
             for a in anchors:
                 self.ref_context[a.id_] = {
+                    'type': 'header',
+                    'ref': ref,
+                }
+            if 'id' in attrib:
+                self.ref_context[attrib['id']] = {
                     'type': 'header',
                     'ref': ref,
                 }
@@ -1063,45 +1137,30 @@ class StackMarkdownGenerator:
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
         """
         All children must already be parsed.
+        There should be no children ``PhantomElement`` too.
         """
         if contains_unparsed_element(elements):
             raise ValueError('<a> contains unparsed element')
         elements = as_text(elements, 'pass')
 
-        texts = as_text(elements, 'warn')
+        elements = as_text(elements, 'warn')
         res = []
+        if 'id' in attrib:
+            res.append(Anchor(attrib['id']))
         if 'href' in attrib and attrib['href'].startswith('#'):
-            refid = attrib['href'][1:]
-            if refid in self.ref_context:
-                if 'id' in attrib:
-                    res.append(Anchor(attrib['id']))
-                ctx = self.ref_context[refid]
-                if ctx['type'] == 'header':
-                    res.extend(['[[#', ctx['ref'], '|'])
-                    res.extend(texts)
-                    res.append(']]')
-                else:
-                    res.extend(['[[#^', ctx['ref'], '|'])
-                    res.extend(texts)
-                    res.append(']]')
-            else:
-                return None
+            res.append(LocalHref(elements, attrib['href'][1:]))
         elif 'href' in attrib:
-            if 'id' in attrib:
-                res.append(Anchor(attrib['id']))
             link = self.try_resolve_local_link(attrib['href'])
             res.append('[')
-            res.extend(texts)
+            res.extend(elements)
             res.extend(['](', VerbText(link), ')'])
         else:
-            if 'id' in attrib:
-                res.append(Anchor(attrib['id']))
-            res.extend(texts)
+            res.extend(elements)
         return as_text(res, 'pass')
 
     def proc_li(
         self,
-        _attrib: ty.Dict[str, str],
+        attrib: ty.Dict[str, str],
         elements: ty.List[IntermediateElementType],
         _parents: ty.List[StartElement],
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
@@ -1118,11 +1177,21 @@ class StackMarkdownGenerator:
         res = as_text(elements, 'pass')
 
         res, anchors = collect_phantom(res, Anchor)
-        if anchors:
+        if anchors or 'id' in attrib:
             h = bookmark_hash(''.join(
-                as_text(res, 'ignore', eval_whitespace=True, eval_verb=True)))
+                as_text(
+                    res,
+                    'ignore',
+                    eval_local_href='elements',
+                    eval_whitespace=True,
+                    eval_verb=True)))
             for a in anchors:
                 self.ref_context[a.id_] = {
+                    'type': 'hash',
+                    'ref': h,
+                }
+            if 'id' in attrib:
+                self.ref_context[attrib['id']] = {
                     'type': 'hash',
                     'ref': h,
                 }
@@ -1338,7 +1407,12 @@ class StackMarkdownGenerator:
         res, anchors = collect_phantom(res, Anchor)
         if anchors:
             h = bookmark_hash(''.join(
-                as_text(res, 'ignore', eval_whitespace=True, eval_verb=True)))
+                as_text(
+                    res,
+                    'ignore',
+                    eval_local_href='elements',
+                    eval_whitespace=True,
+                    eval_verb=True)))
             for a in anchors:
                 self.ref_context[a.id_] = {
                     'type': 'hash',
@@ -1588,7 +1662,7 @@ class StackMarkdownGenerator:
             res.append(Newline())
             headerline = ('|' + '|'.join('---' for _ in range(n_cells)) + '|')
             res.append(headerline)
-            
+
         res = [e for e in res if not isinstance(e, MdTableRow)]
         res.append(LineBreak())
         return as_text(res, 'pass')
@@ -1750,7 +1824,12 @@ class StackMarkdownGenerator:
             res = as_text(elements, 'pass')
 
             h = bookmark_hash(''.join(
-                as_text(res, 'ignore', eval_whitespace=True, eval_verb=True)))
+                as_text(
+                    res,
+                    'ignore',
+                    eval_local_href='elements',
+                    eval_whitespace=True,
+                    eval_verb=True)))
             self.ref_context[attrib['id']] = {
                 'type': 'hash',
                 'ref': h,
