@@ -153,7 +153,7 @@ class KeepOnlySupportedTarget:
             self.stack.append(tag)
         # sub and sup
         elif tag in ['sub', 'sup']:
-            self.nodes.append(StartElement(tag))
+            self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
             self.stack.append(tag)
         # code blocks
         elif tag == 'pre':
@@ -1509,7 +1509,7 @@ class StackMarkdownGenerator:
 
     def proc_sub(
         self,
-        _attrib: ty.Dict[str, str],
+        attrib: ty.Dict[str, str],
         elements: ty.List[IntermediateElementType],
         _parents: ty.List[StartElement],
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
@@ -1525,6 +1525,8 @@ class StackMarkdownGenerator:
         sub_start = self.options['sub_start_symbol']
         sub_end = self.options['sub_end_symbol']
         res = []
+        if 'id' in attrib:
+            res.append(Anchor(attrib['id']))
         if sub_start:
             res.extend(handle_sub_symbol(sub_start))
         res.extend(elements)
@@ -1534,7 +1536,7 @@ class StackMarkdownGenerator:
 
     def proc_sup(
         self,
-        _attrib: ty.Dict[str, str],
+        attrib: ty.Dict[str, str],
         elements: ty.List[IntermediateElementType],
         _parents: ty.List[StartElement],
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
@@ -1550,6 +1552,8 @@ class StackMarkdownGenerator:
         sup_start = self.options['sup_start_symbol']
         sup_end = self.options['sup_end_symbol']
         res = []
+        if 'id' in attrib:
+            res.append(Anchor(attrib['id']))
         if sup_start:
             res.extend(handle_sup_symbol(sup_start))
         res.extend(elements)

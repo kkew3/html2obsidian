@@ -258,3 +258,10 @@ class TestStackMarkdownGenerator:
         self._sample('sample4')
         self._sample('sample4',
                      'https://qnscholar.github.io//2021-12/zotero-if/')
+
+    def test_sample5_validity(self):
+        self._sample('sample5')
+        self._sample(
+            'sample5',
+            'https://timvieira.github.io/blog/post/2014/02/12/visualizing-high-dimensional-functions-with-cross-sections/'
+        )

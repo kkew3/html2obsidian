@@ -1,0 +1,155 @@
+<p>Last September, I gave a talk which included a bunch of two-dimensional plots of
+a high-dimensional objective I was developing specialized algorithms for
+optimizing. A month later, at least three of my colleagues told me that my plots
+had inspired them to make similar plots. The plotting trick is really simple and
+not original, but nonetheless I'll still write it up for all to enjoy.</p>
+<p><strong>Example plot</strong>: This image shows cross-sections of two related functions: a
+non-smooth (black) and a smooth approximating function (blue). The plot shows
+that the approximation is faithful to the overall shape, but sometimes
+over-smooths. In this case, we miss the maximum, which happens near the middle
+of the figure.</p>
+<p><img alt="Alt text" src="/blog/images/cross-section.png"></p>
+<p><strong>Details</strong>: Let <span class="math">\(f: \mathbb{R}^d \rightarrow \mathbb{R}\)</span> be a high-dimensional
+function (<span class="math">\(d \gg 2\)</span>), which you'd like to visualize. Unfortunately, you are like
+me and can't see in high-dimensions what do you do?</p>
+<p>One simple thing to do is take a nonzero vector <span class="math">\(\boldsymbol{d} \in
+\mathbb{R}^d\)</span>, take a point of interest <span class="math">\(\boldsymbol{x}\)</span>, and build a local
+picture of <span class="math">\(f\)</span> by evaluating it at various intervals along the chosen direction
+as follows,</p>
+<div class="math">$$
+f_i = f(\boldsymbol{x} + \alpha_i \ \boldsymbol{d}) \ \ \text{for } \alpha_i \in [\alpha_\min, \alpha_\max]
+$$</div>
+<p>Of course, you'll have to pick a reasonable range and discretize it. Note,
+<span class="math">\(\boldsymbol{x}\)</span> and <span class="math">\(\boldsymbol{d}\)</span> are fixed for all <span class="math">\(\alpha_i\)</span>. Now, you can
+plot <span class="math">\((\alpha_i,f_i)\)</span>.</p>
+<p><strong>Picking directions</strong>: There are many alternatives for picking
+<span class="math">\(\boldsymbol{d}\)</span>, my favorites are:</p>
+<ol>
+<li>
+<p>Coordinate vectors: Varying one (or two) dimensions.</p>
+</li>
+<li>
+<p>Gradient (if it exists), this direction is guaranteed to show a local
+    increase/decrease in the objective, unless it's zero because we're at a
+    local optimum. Some variations on "descent" directions:</p>
+<ul>
+<li>
+<p>Use the gradient direction of a <em>different</em> objective, e.g., plot
+  (nondifferentiable) accuracy on dev data along the (differentiable)
+  likelihood direction on training data.</p>
+</li>
+<li>
+<p>Optimizer trajectory: Use PCA on the optimizer's trajectory to find the
+  directions which summarize the most variation.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>The difference of two interesting points, e.g., the start and end points of
+    your optimization, two different solutions.</p>
+</li>
+<li>
+<p>Random:</p>
+<p>If all your parameters are on an equal scale, I recommend directions drawn
+from a spherical Gaussian.<sup id="sf-visualizing-high-dimensional-functions-with-cross-sections-1-back"><a href="#sf-visualizing-high-dimensional-functions-with-cross-sections-1" class="simple-footnote" title="More formally, vectors drawn from a spherical Gaussian are points uniformly distributed on the surface of a \(d\)-dimensional unit sphere, \(\mathbb{S}^d\). Sampling a vector from a spherical Gaussian is straightforward: sample \(\boldsymbol{d'} \sim \mathcal{N}(\boldsymbol{0},\boldsymbol{I})\), \(\boldsymbol{d} = \boldsymbol{d'} / \| \boldsymbol{d'} \|_2\)">1</a></sup>
+ The reason being that such a
+vector is uniformly distributed across all unit-length directions (i.e., the
+angle of the vector, not it's length). We will vary the length ourselves via
+<span class="math">\(\alpha\)</span>.</p>
+<p>However, often components of <span class="math">\(\boldsymbol{x}\)</span> have different scales, so
+finding a "natural scale" is crucial if we are going to draw conclusions
+that require a comparison of the perturbation sensitivities across several
+dimensions—this is closely related to why we like second-order and
+adaptive optimization algorithms
+(<a href="https://timvieira.github.io/blog/post/2016/05/27/dimensional-analysis-of-gradient-ascent/">discussion</a>);
+<span class="math">\(\boldsymbol{d}\)</span>'s units must match the units of <span class="math">\(\boldsymbol{x}\)</span> in each
+coordinate!</p>
+</li>
+<li>
+<p>Maximize "interestingness": You can also use a direction-optimization
+    procedure to maximize some measure of "interestingness" (e.g., the direction
+    in which training and dev loss differ the most; the "bumpiest" direction or
+    direction taking the biggest range of values).</p>
+</li>
+</ol>
+<p><strong>Extension to 3d</strong>: It's pretty easy to extend these ideas to generating
+three-dimensional plots by using two vectors, <span class="math">\(\boldsymbol{d_1}\)</span> and
+<span class="math">\(\boldsymbol{d_2},\)</span> and varying two parameters <span class="math">\(\alpha\)</span> and <span class="math">\(\beta\)</span>,</p>
+<div class="math">$$
+f(\boldsymbol{x} + \alpha \ \boldsymbol{d_1} + \beta \ \boldsymbol{d_2})
+$$</div>
+<p><strong>Closing remarks</strong>: These types of plots are probably best used to: empirically
+verify/explore properties of an objective function, compare approximations, test
+sensitivity to certain parameters/hyperparameters, visually debug optimization
+algorithms.</p>
+<p><strong>Further reading</strong>:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1712.09913">Visualizing the Loss Landscape of Neural Nets</a></li>
+</ul>
+<h2>Footnotes</h2>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: 'inherit ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script><ol class="simple-footnotes"><li id="sf-visualizing-high-dimensional-functions-with-cross-sections-1">More formally, vectors drawn from a spherical Gaussian are
+points uniformly distributed on the surface of a <span class="math">\(d\)</span>-dimensional unit sphere,
+<span class="math">\(\mathbb{S}^d\)</span>. Sampling a vector from a spherical Gaussian is straightforward:
+sample <span class="math">\(\boldsymbol{d'} \sim \mathcal{N}(\boldsymbol{0},\boldsymbol{I})\)</span>,
+<span class="math">\(\boldsymbol{d} = \boldsymbol{d'} / \| \boldsymbol{d'} \|_2\)</span> <a href="#sf-visualizing-high-dimensional-functions-with-cross-sections-1-back" class="simple-footnote-back">↩</a></li></ol>
