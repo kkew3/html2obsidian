@@ -174,6 +174,20 @@ class TestStackMarkdownGenerator:
         g, md = self._case('strong_in_anchor')
         assert g.generate() == md
 
+    def test_sub_sup(self):
+        g, md = self._case('sub_sup')
+        assert g.generate() == md
+
+    def test_sub_sup_as_ast(self):
+        opts = {
+            'sub_start_symbol': ' *',
+            'sub_end_symbol': '* ',
+            'sup_start_symbol': ' *',
+            'sup_end_symbol': '* ',
+        }
+        g, md = self._case('sub_sup_as_ast', opts)
+        assert g.generate() == md
+
     def test_blockquote(self):
         g, md = self._case('blockquote')
         assert g.generate() == md

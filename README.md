@@ -16,6 +16,7 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
   `<table>`, `<tr>`, `<th>`, `<td>`,
   `<img>`,
   `<b>`, `<strong>`, `<i>`, `<em>`, `<mark>`, `<del>`, `<s>`,
+  `<sub>`, `<sup>`,
   `<pre>`,
   `<div>` (partial),
   `<code>`, `<samp>`, `<kbd>`,
