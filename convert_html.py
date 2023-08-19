@@ -866,7 +866,7 @@ class ProcessingNotConvergedError(Exception):
 
 class StackMarkdownGenerator:
     default_options = {
-        # bullet for <li> of <ul>
+        # bullet for <li> of <ul>; valid values: '-', '*', '+'
         'ul_bullet': '-',
         # symbol for <strong> or <b>; valid values: '*', '_'
         'strong_symbol': '*',
