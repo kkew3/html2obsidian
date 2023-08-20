@@ -216,6 +216,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('code')
         assert g.generate() == md
 
+    def test_code_join(self):
+        g, md = self._case('code_join', {'join_lines_when_possible': True})
+        assert g.generate() == md
+
     def test_math(self):
         g, md = self._case('math')
         assert g.generate() == md

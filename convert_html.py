@@ -1700,15 +1700,29 @@ class StackMarkdownGenerator:
         if contains_unparsed_element(elements):
             raise ValueError('<code> contains unparsed element')
 
-        text = ''.join(
-            as_text(
-                elements,
-                'warn',
-                merge_whitespace=False,
-                eval_whitespace=True,
-                eval_verb=True))
         if 'pre' in parents:
+            text = ''.join(
+                as_text(
+                    elements,
+                    'warn',
+                    merge_whitespace=False,
+                    eval_whitespace=True,
+                    eval_verb=True))
             return [CodeBlock(text), LineBreak()]
+        res = as_text(
+            elements,
+            'warn',
+            merge_whitespace=self.options['join_lines_when_possible'])
+        if self.options['join_lines_when_possible']:
+
+            def sub_newline_with_space_rule(e1, e2):
+                if e1 is not None and isinstance(e2, Newline):
+                    return [e1, Space()]
+                return None
+
+            res = stack_merge(res, sub_newline_with_space_rule)
+        text = ''.join(
+            as_text(res, 'ignore', eval_whitespace=True, eval_verb=True))
         return [InlineCode(text)]
 
     proc_samp = proc_code
