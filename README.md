@@ -52,6 +52,14 @@ python3 convert_html.py --help
 ```
 
 for help.
+Note that sometimes there are warnings issued, e.g.
+
+```
+/path/to/convert_html.py:1183: UserWarning: illegal linebreaks in <a>; ignored
+  warnings.warn('illegal linebreaks in <a>; ignored')
+```
+
+Most of the time, however, it does not imply errors in conversion.
 
 ### Use the library
 
@@ -80,6 +88,9 @@ To run the tests, simply
 ```bash
 pytest
 ```
+
+Note that sometimes there are warnings issued, like mentioned above.
+Please refer to `test_convert_html.py` (in particular, the comments), to see whether such warnings imply error or not.
 
 
 [1]: https://obsidian.md
