@@ -14,6 +14,8 @@
 
 ![往期精彩](https://figurebed-iseex.oss-cn-hangzhou.aliyuncs.com/img/20211230231643.jpg)
 
+Zotero IF 插件正式发布了！ 🎉
+
 ## 使用方法
 
 前往 [GitHub](https://github.com/qnscholar/zotero-if)，了解 Zotero IF 插件的详细用法。或者前往 Zotero 设置界面，阅读 Zotero IF 插件【**帮助文档**】。

@@ -52,8 +52,6 @@ def f(x):
     return d + e
 ```
 
-^556a4e
-
 Symbolic differentiation would have to use the "flat" version of this function,
 so no intermediate variable $\Rightarrow$ slow.
 
@@ -353,8 +351,6 @@ I have coded up and tested the Lagrangian perspective on automatic
 differentiation that I presented in this article. The code is available in this
 [gist](https://gist.github.com/timvieira/8addcb81dd622b0108e0e7e06af74185).
 
-^bd4540
-
 # Comments
 
 [comments powered by Disqus.](http://disqus.com/?ref_noscript) ^9e2afe
@@ -372,6 +368,10 @@ differentiation that I presented in this article. The code is available in this
 [numerical](https://timvieira.github.io/blog/tag/numerical.html), [efficiency](https://timvieira.github.io/blog/tag/efficiency.html), [sampling-without-replacement](https://timvieira.github.io/blog/tag/sampling-without-replacement.html), [statistics](https://timvieira.github.io/blog/tag/statistics.html), [notebook](https://timvieira.github.io/blog/tag/notebook.html), [ordered-sampling](https://timvieira.github.io/blog/tag/ordered-sampling.html), [sampling](https://timvieira.github.io/blog/tag/sampling.html), [algorithms](https://timvieira.github.io/blog/tag/algorithms.html), [Gumbel](https://timvieira.github.io/blog/tag/gumbel.html), [decision-making](https://timvieira.github.io/blog/tag/decision-making.html), [reservoir-sampling](https://timvieira.github.io/blog/tag/reservoir-sampling.html), [optimization](https://timvieira.github.io/blog/tag/optimization.html), [rl](https://timvieira.github.io/blog/tag/rl.html), [machine-learning](https://timvieira.github.io/blog/tag/machine-learning.html), [calculus](https://timvieira.github.io/blog/tag/calculus.html), [automatic-differentiation](https://timvieira.github.io/blog/tag/automatic-differentiation.html), [implicit-function-theorem](https://timvieira.github.io/blog/tag/implicit-function-theorem.html), [Lagrange-multipliers](https://timvieira.github.io/blog/tag/lagrange-multipliers.html), [testing](https://timvieira.github.io/blog/tag/testing.html), [counterfactual-reasoning](https://timvieira.github.io/blog/tag/counterfactual-reasoning.html), [importance-sampling](https://timvieira.github.io/blog/tag/importance-sampling.html), [datastructures](https://timvieira.github.io/blog/tag/datastructures.html), [incremental-computation](https://timvieira.github.io/blog/tag/incremental-computation.html), [data-structures](https://timvieira.github.io/blog/tag/data-structures.html), [rant](https://timvieira.github.io/blog/tag/rant.html), [hyperparameter-optimization](https://timvieira.github.io/blog/tag/hyperparameter-optimization.html), [crf](https://timvieira.github.io/blog/tag/crf.html), [deep-learning](https://timvieira.github.io/blog/tag/deep-learning.html), [structured-prediction](https://timvieira.github.io/blog/tag/structured-prediction.html), [visualization](https://timvieira.github.io/blog/tag/visualization.html)
 
 [Follow @xtimv](http://twitter.com/xtimv)
+
+^18e626
+
+^a13e45
 
 Copyright © 2014–2021 Tim Vieira —
 Powered by [Pelican](http://getpelican.com)
