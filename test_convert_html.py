@@ -293,3 +293,11 @@ class TestStackMarkdownGenerator:
             'sample5',
             'https://timvieira.github.io/blog/post/2014/02/12/visualizing-high-dimensional-functions-with-cross-sections/'
         )
+
+    # There might be a warning in this test. It's not a bug.
+    def test_sample6_clean_validity(self):
+        self._sample('sample6_clean')
+        self._sample(
+            'sample6_clean',
+            'https://www.pinecone.io/learn/batch-layer-normalization/#Why-Should-You-Normalize-Inputs-in-a-Neural-Network'
+        )
