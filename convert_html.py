@@ -1153,7 +1153,21 @@ class StackMarkdownGenerator:
         elements = as_text(elements, 'pass')
 
         elements = as_text(elements, 'warn')
+        if any(isinstance(e, LineBreak) for e in elements):
+            warnings.warn('illegal linebreaks in <a>; ignored')
+            elements = [e for e in elements if not isinstance(e, LineBreak)]
+
+        def sub_newline_with_space_rule(e1, e2):
+            if isinstance(e2, Newline):
+                return [e1, Space()]
+            return None
+
+        elements = stack_merge(elements, sub_newline_with_space_rule)
+        front_spaces = lstrip_whitespace(elements, Space)
+        back_spaces = rstrip_whitespace(elements, Space)
+
         res = []
+        res.extend(front_spaces)
         if 'id' in attrib:
             res.append(Anchor(attrib['id']))
         if 'href' in attrib and attrib['href'].startswith('#'):
@@ -1165,6 +1179,7 @@ class StackMarkdownGenerator:
             res.extend(['](', VerbText(link), ')'])
         else:
             res.extend(elements)
+        res.extend(back_spaces)
         return as_text(res, 'pass')
 
     def proc_li(

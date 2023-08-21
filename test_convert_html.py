@@ -200,6 +200,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('ul_star_bullet', {'ul_bullet': '*'})
         assert g.generate() == md
 
+    def test_ul_with_a_newline(self):
+        g, md = self._case('ul_with_a_newline')
+        assert g.generate() == md
+
     def test_table(self):
         g, md = self._case('table')
         assert g.generate() == md
