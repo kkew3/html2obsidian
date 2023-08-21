@@ -179,8 +179,8 @@ class KeepOnlySupportedTarget:
                 self.nodes.append(StartElement(tag, {'class': 'math'}))
                 self.stack.append(tag)
         # misc
-        elif tag == 'div' and 'id' in attrib:
-            self.nodes.append(StartElement(tag, {'id': attrib['id']}))
+        elif tag == 'div':
+            self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
             self.stack.append(tag)
         else:
             self.active = False
@@ -1892,7 +1892,10 @@ class StackMarkdownGenerator:
             res.append(LineBreak())
             return as_text(res, 'pass')
 
-        raise NotImplementedError('not implemented for <div>')
+        res = []
+        res.extend(elements)
+        res.append(LineBreak())
+        return res
 
     def proc_span(
         self,

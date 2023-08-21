@@ -240,6 +240,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('space_in_dollar_inline_math')
         assert g.generate() == md
 
+    def test_empty_div_between_a(self):
+        g, md = self._case('empty_div_between_a')
+        assert g.generate() == md
+
     def _sample(self, name: str, url: str = None):
         html = read_sample(name)
         elements = etree.HTML(
