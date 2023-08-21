@@ -165,6 +165,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('header')
         assert g.generate() == md
 
+    def test_header_newline(self):
+        g, md = self._case('header_newline')
+        assert g.generate() == md
+
     def test_header_to_elevate(self):
         g, md = self._case('header_to_elevate',
                            {'try_make_highest_header_hn': 1})

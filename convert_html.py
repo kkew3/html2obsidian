@@ -1105,6 +1105,18 @@ class StackMarkdownGenerator:
         if contains_unparsed_element(elements):
             raise ValueError('<h{}> contains unparsed element'.format(n))
         res = as_text(elements, 'pass')
+        if any(isinstance(e, LineBreak) for e in res):
+            warnings.warn('illegal linebreaks in <h{}>; ignored'.format(n))
+            res = [e for e in res if not isinstance(e, LineBreak)]
+
+        def sub_newline_with_space_rule(e1, e2):
+            if isinstance(e2, Newline):
+                return [e1, Space()]
+            return None
+
+        res = stack_merge(res, sub_newline_with_space_rule)
+        lstrip_whitespace(res, Space)
+        rstrip_whitespace(res, Space)
 
         res.insert(0, HeaderHashes('#' * n))
         res.insert(1, Space())
