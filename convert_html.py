@@ -1322,7 +1322,7 @@ class StackMarkdownGenerator:
                     and isinstance(e2, MdListItemIndentPointAtBullet)):
                 return [Newline(), e2]
             # if there's no newline at all, add one
-            if (isinstance(e1, (str, VerbText))
+            if (isinstance(e1, (str, VerbText, LocalHref))
                     and isinstance(e2, MdListItemIndentPointAtBullet)):
                 return [e1, Newline(), e2]
             return None
@@ -1392,7 +1392,7 @@ class StackMarkdownGenerator:
                     and isinstance(e2, MdListItemIndentPointAtBullet)):
                 return [Newline(), e2]
             # if there's no newline at all, add one
-            if (isinstance(e1, (str, VerbText))
+            if (isinstance(e1, (str, VerbText, LocalHref))
                     and isinstance(e2, MdListItemIndentPointAtBullet)):
                 return [e1, Newline(), e2]
             return None

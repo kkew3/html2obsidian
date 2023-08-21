@@ -208,6 +208,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('ul_with_a_newline')
         assert g.generate() == md
 
+    def test_ul_ol_compact_withindoc_a(self):
+        g, md = self._case('ul_ol_compact_withindoc_a')
+        assert g.generate() == md
+
     def test_table(self):
         g, md = self._case('table')
         assert g.generate() == md
