@@ -21,7 +21,7 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
   `<div>` (partial),
   `<code>`, `<samp>`, `<kbd>`,
   `<span>` (partial)
-- Math style support: `$...$`, `\(...\)`, `$$...$$`, `\[...\]`
+- Math style support: `$...$`, `\(...\)`, `$$...$$`, `\[...\]` (mathml currently not supported)
 - Within-document link support
 - Within-site hyperlink/image support
 
