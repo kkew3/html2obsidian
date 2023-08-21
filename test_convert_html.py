@@ -248,6 +248,14 @@ class TestStackMarkdownGenerator:
         g, md = self._case('empty_div_between_a')
         assert g.generate() == md
 
+    def test_h1_after_unknown_span(self):
+        g, md = self._case('h1_after_unknown_span')
+        assert g.generate() == md
+
+    def test_h1_after_unknown_div(self):
+        g, md = self._case('h1_after_unknown_div')
+        assert g.generate() == md
+
     def _sample(self, name: str, url: str = None):
         html = read_sample(name)
         elements = etree.HTML(

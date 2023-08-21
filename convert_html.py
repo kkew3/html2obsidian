@@ -159,29 +159,41 @@ class KeepOnlySupportedTarget:
         elif tag == 'pre':
             self.nodes.append(StartElement(tag))
             self.stack.append(tag)
-        elif tag == 'div' and 'class' in attrib:
-            for v in attrib['class'].split():
-                if v.startswith('language-'):
-                    self.nodes.append(StartElement(tag, {'class': v}))
+        elif tag == 'div':
+            if 'class' in attrib:
+                for v in attrib['class'].split():
+                    if v.startswith('language-'):
+                        self.nodes.append(StartElement(tag, {'class': v}))
+                        self.stack.append(tag)
+                        break
+                    # also math
+                    if v == 'math':
+                        self.nodes.append(StartElement(tag, {'class': 'math'}))
+                        self.stack.append(tag)
+                        break
+                # misc
+                else:
+                    self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
                     self.stack.append(tag)
-                    break
-                # also math
-                if v == 'math':
-                    self.nodes.append(StartElement(tag, {'class': 'math'}))
-                    self.stack.append(tag)
-                    break
+            # misc
+            else:
+                self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
+                self.stack.append(tag)
         elif tag in ['code', 'samp', 'kbd']:
             self.nodes.append(StartElement(tag, attrib))
             self.stack.append(tag)
         # math (alternative)
-        elif tag == 'span' and 'class' in attrib:
-            if attrib['class'] == 'math':
-                self.nodes.append(StartElement(tag, {'class': 'math'}))
+        elif tag == 'span':
+            if 'class' in attrib:
+                if attrib['class'] == 'math':
+                    self.nodes.append(StartElement(tag, {'class': 'math'}))
+                    self.stack.append(tag)
+                else:
+                    self.nodes.append(StartElement(tag))
+                    self.stack.append(tag)
+            else:
+                self.nodes.append(StartElement(tag))
                 self.stack.append(tag)
-        # misc
-        elif tag == 'div':
-            self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
-            self.stack.append(tag)
         else:
             self.active = False
 
@@ -1077,6 +1089,7 @@ class StackMarkdownGenerator:
 
             res = stack_merge(res, sub_newline_with_space_rule)
 
+        res.insert(0, LineBreak())
         res.append(LineBreak())
         res = as_text(res, phantom_policy='warn', eval_whitespace=True)
         res2 = []
@@ -1122,11 +1135,12 @@ class StackMarkdownGenerator:
         res.insert(1, Space())
 
         res, anchors = collect_phantom(res, Anchor)
+        res.insert(0, LineBreak())
         res.append(LineBreak())
         if 'id' in attrib or anchors:
             ref = ''.join(
                 as_text(
-                    res[2:-1],
+                    res[3:-1],
                     phantom_policy='ignore',
                     eval_local_href='elements',
                     eval_whitespace=True,
@@ -1911,7 +1925,7 @@ class StackMarkdownGenerator:
 
         res = elements.copy()
 
-        if attrib['class'] == 'math':
+        if attrib.get('class', None) == 'math':
             text = ''.join(
                 as_text(res, 'warn', eval_whitespace=True, eval_verb=True))
 
@@ -1932,8 +1946,7 @@ class StackMarkdownGenerator:
                           'elements; passed as is')
             return as_text(res, 'pass')
 
-        raise NotImplementedError(
-            'not implemented for <span> class "{}"'.format(attrib['class']))
+        return res
 
 
 def _make_parser():
