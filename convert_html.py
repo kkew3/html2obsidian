@@ -437,14 +437,15 @@ class Tab(Whitespace):
 
 
 def lstrip_whitespace(
-    elements,
+    elements: ty.List[T],
     strip_type: ty.Union[ty.Type, ty.List[ty.Type]] = Whitespace,
-) -> None:
+) -> ty.List[T]:
     """
     Strip leading whitespace elements in place.
 
     :param elements:
     :param strip_type: whitespace type(s)
+    :return: stripped elements
     """
     if not isinstance(strip_type, list):
         strip_type = [strip_type]
@@ -452,21 +453,25 @@ def lstrip_whitespace(
         if not issubclass(t, Whitespace):
             raise TypeError('strip_type ({}) is not Whitespace'.format(
                 strip_type.__name__))
+    stripped_elements = []
     i = index_beg(elements)
     while i is not None and isinstance(elements[i], tuple(strip_type)):
+        stripped_elements.append(elements[i])
         del elements[i]
         i = index_beg(elements)
+    return stripped_elements
 
 
 def rstrip_whitespace(
-    elements,
+    elements: ty.List[T],
     strip_type: ty.Union[ty.Type, ty.List[ty.Type]] = Whitespace,
-) -> None:
+) -> ty.List[T]:
     """
     Strip trailing whitespace elements in place.
 
     :param elements:
     :param strip_type: whitespace type(s)
+    :return: stripped elements (not in reversed order)
     """
     if not isinstance(strip_type, list):
         strip_type = [strip_type]
@@ -474,10 +479,14 @@ def rstrip_whitespace(
         if not issubclass(t, Whitespace):
             raise TypeError('strip_type ({}) is not Whitespace'.format(
                 strip_type.__name__))
+    stripped_elements = []
     i = index_end(elements)
     while i is not None and isinstance(elements[i], tuple(strip_type)):
+        stripped_elements.append(elements[i])
         del elements[i]
         i = index_end(elements)
+    stripped_elements.reverse()
+    return stripped_elements
 
 
 def index_beg(elements) -> ty.Optional[int]:
