@@ -16,21 +16,21 @@ Two years later, here we go.
 
 **Table of contents**
 
-- [[#Triplet loss and triplet mining|Triplet loss and triplet mining]] ^c05567
-    - [[#Why not just use softmax?|Why not just use softmax?]] ^1336c1
-    - [[#Definition of the loss|Definition of the loss]] ^3d0c94
-    - [[#Triplet mining|Triplet mining]] ^3f6abd
-    - [[#Offline and online triplet mining|Offline and online triplet mining]] ^acd754
-    - [[#Strategies in online mining|Strategies in online mining]] ^92c487
-- [[#A naive implementation of triplet loss|A naive implementation of triplet loss]] ^312adb
-- [[#A better implementation with online triplet mining|A better implementation with online triplet mining]] ^188b8a
-    - [[#Compute the distance matrix|Compute the distance matrix]] ^da8c8d
-    - [[#Batch all strategy|Batch all strategy]] ^e35844
-    - [[#Batch hard strategy|Batch hard strategy]] ^29b5ac
-    - [[#Testing our implementation|Testing our implementation]] ^e8a68f
-- [[#Experience with MNIST|Experience with MNIST]] ^ddaaa4
-- [[#Conclusion|Conclusion]] ^e39262
-- [[#Resources|Resources]] ^87df60
+- [[#Triplet loss and triplet mining|Triplet loss and triplet mining]]
+    - [[#Why not just use softmax?|Why not just use softmax?]]
+    - [[#Definition of the loss|Definition of the loss]]
+    - [[#Triplet mining|Triplet mining]]
+    - [[#Offline and online triplet mining|Offline and online triplet mining]]
+    - [[#Strategies in online mining|Strategies in online mining]]
+- [[#A naive implementation of triplet loss|A naive implementation of triplet loss]]
+- [[#A better implementation with online triplet mining|A better implementation with online triplet mining]]
+    - [[#Compute the distance matrix|Compute the distance matrix]]
+    - [[#Batch all strategy|Batch all strategy]]
+    - [[#Batch hard strategy|Batch hard strategy]]
+    - [[#Testing our implementation|Testing our implementation]]
+- [[#Experience with MNIST|Experience with MNIST]]
+- [[#Conclusion|Conclusion]]
+- [[#Resources|Resources]]
 
 ---
 
