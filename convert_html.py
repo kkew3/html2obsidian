@@ -694,7 +694,7 @@ class LocalHref:
                  href: str):
         """
         :param elements: children elements
-        :param the href without the leading '#'
+        :param href: the href without the leading '#'
         """
         self.elements = elements
         self.href = href
@@ -713,25 +713,57 @@ class LocalHref:
         return res
 
 
+class BookmarkHash:
+    __slots__ = ['hash_']
+
+    def __init__(self, hash_: str):
+        self.hash_ = hash_
+
+    def __repr__(self):
+        return '{}(hash_={!r})'.format(type(self).__name__, self.hash_)
+
+    def __str__(self):
+        return ' ^' + self.hash_
+
+
 IntermediateElementType = ty.Union[SupportedElementType, PhantomElement,
-                                   VerbText, Whitespace, LocalHref]
+                                   VerbText, Whitespace, LocalHref,
+                                   BookmarkHash]
 
 
 def resolve_local_hrefs(
     elements: ty.List[IntermediateElementType],
-    ref_context: ty.Dict[str, ty.Dict[str, str]],
+    ref_context: ty.Dict[str, 'RefContextEntry'],
 ) -> None:
     """Resolve ``LocalHref``s inplace."""
     for e in elements:
         if isinstance(e, LocalHref):
             try:
                 ctx = ref_context[e.href]
-                if ctx['type'] == 'header':
-                    e.ref = ctx['ref']
+                if ctx.type_ == 'header':
+                    e.ref = ctx.ref
                 else:
-                    e.ref = '^' + ctx['ref']
+                    e.ref = '^' + ctx.ref
+                ref_context[e.href].used = True
             except KeyError:
                 pass
+
+
+def resolve_bookmark_hashes(
+    elements: ty.List[IntermediateElementType],
+    ref_context: ty.Dict[str, 'RefContextEntry'],
+) -> ty.List[IntermediateElementType]:
+    """Resolve ``BookmarkHash``s."""
+    res = []
+    for e in elements:
+        if isinstance(e, BookmarkHash):
+            for ctx in ref_context.values():
+                if ctx.type_ == 'hash' and ctx.ref == e.hash_ and ctx.used:
+                    res.append(str(e))
+                    break
+        else:
+            res.append(e)
+    return res
 
 
 def escape(text: str) -> str:
@@ -748,6 +780,8 @@ def as_text(
     tag_policy: ty.Literal['pass', 'raise'] = 'raise',
     merge_whitespace: bool = True,
     eval_local_href: ty.Literal['elements', 'text'] = False,
+    bookmark_hash_policy: ty.Literal['pass', 'ignore', 'eval',
+                                     'raise'] = 'pass',
     eval_whitespace: bool = False,
     escape_text: bool = False,
     eval_verb: bool = False,
@@ -762,6 +796,9 @@ def as_text(
     :param eval_local_href: if 'text', evaluate ``LocalHref`` to text; if
            'elements', evaluate it to its children elements; if ``False``,
            don't evaluate it
+    :param bookmark_hash_policy: if 'pass', pass ``BookmarkHash`` object as is;
+           if 'ignore', evalutate to empty string; if 'eval', evaluate using
+           its ``__str__`` method; if 'raise', raise ``TypeError``
     :param eval_whitespace: if ``True``, evaluate ``Whitespace`` after
            evaluating ``LocalHref``
     :param escape_text: if ``True``, escape non-``VerbText`` text after
@@ -773,7 +810,7 @@ def as_text(
     # escape and type check
     res1 = []
     for e in elements:
-        if isinstance(e, (str, VerbText, Whitespace, LocalHref)):
+        if isinstance(e, (str, VerbText, Whitespace, LocalHref, BookmarkHash)):
             res1.append(e)
         elif isinstance(e, PhantomElement):
             if phantom_policy == 'pass':
@@ -836,6 +873,18 @@ def as_text(
     elif eval_local_href:
         raise ValueError(
             'invalid eval_local_href value: {}'.format(eval_local_href))
+    if bookmark_hash_policy == 'pass':
+        pass
+    elif bookmark_hash_policy == 'ignore':
+        res3 = [e for e in res3 if not isinstance(e, BookmarkHash)]
+    elif bookmark_hash_policy == 'eval':
+        res3 = [str(e) if isinstance(e, BookmarkHash) else e for e in res3]
+    elif bookmark_hash_policy == 'raise':
+        if any(isinstance(e, BookmarkHash) for e in res3):
+            raise TypeError('unexpected BookmarkHash encountered')
+    else:
+        raise ValueError(
+            'invalid bookmark_hash_policy: {}'.format(bookmark_hash_policy))
     if eval_whitespace:
         res3 = [str(e) if isinstance(e, Whitespace) else e for e in res3]
     if escape_text:
@@ -859,7 +908,8 @@ def check_converged(elements: ty.List[IntermediateElementType]) -> bool:
     """
     for e in elements:
         if not (isinstance(e, (str, VerbText, Whitespace, PhantomElement)) or
-                (isinstance(e, LocalHref) and e.ref is not None)):
+                (isinstance(e, LocalHref) and e.ref is not None)
+                or isinstance(e, BookmarkHash)):
             return False
     return True
 
@@ -887,6 +937,19 @@ def collect_phantom(
 
 class ProcessingNotConvergedError(Exception):
     pass
+
+
+class RefContextEntry:
+    __slots__ = ['type_', 'ref', 'used']
+
+    def __init__(
+        self,
+        type_: ty.Literal['hash', 'header'],
+        ref: str,
+    ) -> None:
+        self.type_: str = type_
+        self.ref: str = ref
+        self.used: bool = False
 
 
 class StackMarkdownGenerator:
@@ -940,7 +1003,7 @@ class StackMarkdownGenerator:
 
         self.stack: ty.List[IntermediateElementType] = elements
         # to store reference context
-        self.ref_context: ty.Dict[str, ty.Dict[str, str]] = {}
+        self.ref_context: ty.Dict[str, RefContextEntry] = {}
 
         if page_url:
             self.page_url_info = urlparse(page_url)
@@ -995,6 +1058,8 @@ class StackMarkdownGenerator:
             resolve_local_hrefs(self.stack, self.ref_context)
             n_loop += 1
 
+        self.stack = resolve_bookmark_hashes(self.stack, self.ref_context)
+
         # if requested, make header levels as high as possible
         if self.options['try_make_highest_header_hn']:
             target_level = self.options['try_make_highest_header_hn']
@@ -1027,6 +1092,7 @@ class StackMarkdownGenerator:
                 self.stack,
                 phantom_policy='warn',
                 eval_local_href='text',
+                bookmark_hash_policy='raise',
                 eval_whitespace=True,
                 escape_text=True,
                 eval_verb=True))
@@ -1078,14 +1144,12 @@ class StackMarkdownGenerator:
                     res,
                     phantom_policy='warn',
                     eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
                     eval_whitespace=True,
                     eval_verb=True)))
             for a in anchors:
-                self.ref_context[a.id_] = {
-                    'type': 'hash',
-                    'ref': h,
-                }
-            res.append(' ^{}'.format(h))
+                self.ref_context[a.id_] = RefContextEntry('hash', h)
+            res.append(BookmarkHash(h))
 
         if self.options['join_lines_when_possible']:
 
@@ -1150,18 +1214,13 @@ class StackMarkdownGenerator:
                     res[3:-1],
                     phantom_policy='ignore',
                     eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
                     eval_whitespace=True,
                     eval_verb=True))
             for a in anchors:
-                self.ref_context[a.id_] = {
-                    'type': 'header',
-                    'ref': ref,
-                }
+                self.ref_context[a.id_] = RefContextEntry('header', ref)
             if 'id' in attrib:
-                self.ref_context[attrib['id']] = {
-                    'type': 'header',
-                    'ref': ref,
-                }
+                self.ref_context[attrib['id']] = RefContextEntry('header', ref)
 
                 def handle_self_ref_rule(e1, e2):
                     if isinstance(e2, LocalHref):
@@ -1250,18 +1309,13 @@ class StackMarkdownGenerator:
                     res,
                     'ignore',
                     eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
                     eval_whitespace=True,
                     eval_verb=True)))
             for a in anchors:
-                self.ref_context[a.id_] = {
-                    'type': 'hash',
-                    'ref': h,
-                }
+                self.ref_context[a.id_] = RefContextEntry('hash', h)
             if 'id' in attrib:
-                self.ref_context[attrib['id']] = {
-                    'type': 'hash',
-                    'ref': h,
-                }
+                self.ref_context[attrib['id']] = RefContextEntry('hash', h)
         else:
             h = None
 
@@ -1306,14 +1360,14 @@ class StackMarkdownGenerator:
             def sub_whitespace_before_mdlist_rule(e1, e2):
                 if isinstance(e1, Whitespace) and isinstance(e2, MdList):
                     if h is not None:
-                        return [' ^{}'.format(h), Newline(), e2]
+                        return [BookmarkHash(h), Newline(), e2]
                     return [Newline(), e2]
                 return None
 
             res = stack_merge(res, sub_whitespace_before_mdlist_rule)
         else:
             if h is not None:
-                res.append(' ^{}'.format(h))
+                res.append(BookmarkHash(h))
 
         return as_text(res, 'pass')
 
@@ -1478,13 +1532,11 @@ class StackMarkdownGenerator:
                     res,
                     'ignore',
                     eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
                     eval_whitespace=True,
                     eval_verb=True)))
             for a in anchors:
-                self.ref_context[a.id_] = {
-                    'type': 'hash',
-                    'ref': h,
-                }
+                self.ref_context[a.id_] = RefContextEntry('hash', h)
         else:
             h = None
 
@@ -1501,7 +1553,7 @@ class StackMarkdownGenerator:
         res = stack_merge(res, prepend_quote_symbol_at_newline_rule)
 
         if h:
-            res.append(' ^{}'.format(h))
+            res.append(BookmarkHash(h))
 
         res.append(LineBreak())
         return as_text(res, 'pass')
@@ -1793,12 +1845,14 @@ class StackMarkdownGenerator:
                     'warn',
                     merge_whitespace=False,
                     eval_whitespace=True,
+                    bookmark_hash_policy='raise',
                     eval_verb=True))
             return [CodeBlock(text), LineBreak()]
         res = as_text(
             elements,
             'warn',
-            merge_whitespace=self.options['join_lines_when_possible'])
+            merge_whitespace=self.options['join_lines_when_possible'],
+            bookmark_hash_policy='raise')
         if self.options['join_lines_when_possible']:
 
             def sub_newline_with_space_rule(e1, e2):
@@ -1808,7 +1862,12 @@ class StackMarkdownGenerator:
 
             res = stack_merge(res, sub_newline_with_space_rule)
         text = ''.join(
-            as_text(res, 'ignore', eval_whitespace=True, eval_verb=True))
+            as_text(
+                res,
+                'ignore',
+                eval_whitespace=True,
+                bookmark_hash_policy='raise',
+                eval_verb=True))
         return [InlineCode(text)]
 
     proc_samp = proc_code
@@ -1830,7 +1889,11 @@ class StackMarkdownGenerator:
         res = elements.copy()
 
         if any(isinstance(e, CodeBlock) for e in res):
-            res = as_text(res, 'pass', merge_whitespace=False)
+            res = as_text(
+                res,
+                'pass',
+                merge_whitespace=False,
+                bookmark_hash_policy='raise')
             if any(not isinstance(e, (CodeBlock, Whitespace)) for e in res):
                 warnings.warn('<pre> contains non code block element; ignored')
             res = [e for e in res if isinstance(e, CodeBlock)]
@@ -1845,6 +1908,7 @@ class StackMarkdownGenerator:
                 'warn',
                 merge_whitespace=False,
                 eval_whitespace=True,
+                bookmark_hash_policy='raise',
                 eval_verb=True))
         return [CodeBlock(text), LineBreak()]
 
@@ -1863,7 +1927,11 @@ class StackMarkdownGenerator:
             res = elements.copy()
 
             if attrib['class'].startswith('language-'):
-                res = as_text(res, 'pass', merge_whitespace=False)
+                res = as_text(
+                    res,
+                    'pass',
+                    merge_whitespace=False,
+                    bookmark_hash_policy='raise')
                 language = attrib['class'][9:]
 
                 if any(isinstance(e, CodeBlock) for e in res):
@@ -1888,7 +1956,12 @@ class StackMarkdownGenerator:
 
             if attrib['class'] == 'math':
                 text = ''.join(
-                    as_text(res, 'warn', eval_whitespace=True, eval_verb=True))
+                    as_text(
+                        res,
+                        'warn',
+                        eval_whitespace=True,
+                        bookmark_hash_policy='raise',
+                        eval_verb=True))
                 text = text.strip()
                 if text.startswith('$$') and text.endswith('$$'):
                     return [MathBlock(text[2:-2]), LineBreak()]
@@ -1932,13 +2005,11 @@ class StackMarkdownGenerator:
                     res,
                     'ignore',
                     eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
                     eval_whitespace=True,
                     eval_verb=True)))
-            self.ref_context[attrib['id']] = {
-                'type': 'hash',
-                'ref': h,
-            }
-            res.append(' ^{}'.format(h))
+            self.ref_context[attrib['id']] = RefContextEntry('hash', h)
+            res.append(BookmarkHash(h))
             res.append(LineBreak())
             return as_text(res, 'pass')
 
@@ -1963,7 +2034,12 @@ class StackMarkdownGenerator:
 
         if attrib.get('class', None) == 'math':
             text = ''.join(
-                as_text(res, 'warn', eval_whitespace=True, eval_verb=True))
+                as_text(
+                    res,
+                    'warn',
+                    eval_whitespace=True,
+                    bookmark_hash_policy='raise',
+                    eval_verb=True))
 
             res = search_slashparenthesis_inline_math(text)
             if any(isinstance(e, InlineMath) for e in res):
