@@ -1,6 +1,8 @@
 import argparse
 import typing as ty
 import hashlib
+import base64
+from pathlib import Path
 import re
 import functools
 from urllib.parse import urlparse
@@ -173,11 +175,13 @@ class KeepOnlySupportedTarget:
                         break
                 # misc
                 else:
-                    self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
+                    self.nodes.append(
+                        StartElement(tag, subset_dict(attrib, ['id'])))
                     self.stack.append(tag)
             # misc
             else:
-                self.nodes.append(StartElement(tag, subset_dict(attrib, ['id'])))
+                self.nodes.append(
+                    StartElement(tag, subset_dict(attrib, ['id'])))
                 self.stack.append(tag)
         elif tag in ['code', 'samp', 'kbd']:
             self.nodes.append(StartElement(tag, attrib))
@@ -916,7 +920,10 @@ class StackMarkdownGenerator:
         # then all <h2> will become <h1>, <h3> become <h2>, etc.
         'try_make_highest_header_hn': None,
         # if `True`, indent embedded lists using Tab rather than four spaces
-        'indent_list_with_tab': False
+        'indent_list_with_tab': False,
+        # if not `None`, interpret base64 hard-coded img and write the img
+        # to this folder (should already exist)
+        'write_base64_img_to': None,
     }
 
     def __init__(
@@ -1733,7 +1740,26 @@ class StackMarkdownGenerator:
         elements = as_text(elements, 'pass')
         res = ['![', attrib.get('alt', '')]
         res.extend(elements)
-        link = self.try_resolve_local_link(attrib.get('src', ''))
+        src = attrib.get('src', '')
+        link = None
+        if self.options['write_base64_img_to']:
+            match = re.fullmatch(
+                r'data:(.+/)?(.+);base64,(.+)',
+                src,
+                flags=re.DOTALL | re.MULTILINE)
+            if match:
+                data = base64.b64decode(match.group(3).strip())
+                summary = hashlib.sha1(data).hexdigest()
+                tofile = Path(self.options['write_base64_img_to'])
+                if not tofile.is_dir():
+                    raise FileNotFoundError(
+                        '"{}" (dir) not found'.format(tofile))
+                tofile /= '{}.{}'.format(summary, match.group(2))
+                with open(tofile, 'wb') as outfile:
+                    outfile.write(data)
+                link = str(tofile)
+        if not link:
+            link = self.try_resolve_local_link(src)
         res.extend(['](', VerbText(link), ')'])
         return as_text(res, 'pass')
 
@@ -1977,6 +2003,8 @@ def _make_parser():
         '--indent-list-with-tab',
         dest='indent_list_with_tab',
         action='store_true')
+    args.add_argument(
+        '--write-base64-img-to', dest='write_base64_img_to', type=Path)
     args.add_argument('--url', help='url if the html is downloaded from web')
     args.add_argument('html_file', type=Path, help='the html file to read')
     args.add_argument(
@@ -1999,6 +2027,7 @@ def _main():
         'join_lines_when_possible',
         'try_make_highest_header_hn',
         'indent_list_with_tab',
+        'write_base64_img_to',
     ]
     options = {k: getattr(args, k) for k in keys}
     with open(args.html_file, encoding='utf-8') as infile:
