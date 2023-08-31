@@ -1162,6 +1162,16 @@ class StackMarkdownGenerator:
                     'type': 'header',
                     'ref': ref,
                 }
+
+                def handle_self_ref_rule(e1, e2):
+                    if isinstance(e2, LocalHref):
+                        if e2.href == attrib['id']:
+                            ret = [e1]
+                            ret.extend(e2.elements)
+                            return ret
+                    return None
+
+                res = stack_merge(res, handle_self_ref_rule)
         return as_text(res, 'pass')
 
     proc_h1 = functools.partialmethod(_proc_headers, 1)

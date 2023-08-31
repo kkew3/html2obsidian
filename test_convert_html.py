@@ -174,6 +174,10 @@ class TestStackMarkdownGenerator:
                            {'try_make_highest_header_hn': 1})
         assert g.generate() == md
 
+    def test_header_self_reference(self):
+        g, md = self._case('header_self_reference')
+        assert g.generate() == md
+
     def test_strong_in_anchor(self):
         g, md = self._case('strong_in_anchor')
         assert g.generate() == md
