@@ -93,4 +93,9 @@ Note that sometimes there are warnings issued, like mentioned above.
 Please refer to `test_convert_html.py` (in particular, the comments), to see whether such warnings imply error or not.
 
 
+## Bugs
+
+- `$$..$$`-style math is not recognized when embedded in `<p>` rather than in `<div class="math">`.
+
+
 [1]: https://obsidian.md
