@@ -46,13 +46,17 @@ To overcome the above-mentioned issues of longer training time and instability, 
 
 Normalization works by mapping all values of a feature to be in the range [0,1] using the transformation:
 
-xnorm​=xmax​−xmin​x−xmin​​
+$$
+x_{norm} = \frac{x-x_{min}}{x_{max}-x_{min}}
+$$xnorm​=xmax​−xmin​x−xmin​​
 
 Suppose a particular input feature x has values in the range [x\_min, x\_max]. When x is equal to x\_min, x\_norm is equal to 0 and when x is equal to x\_max, x\_norm is equal to 1. So for all values of x between x\_min and x\_max, x\_norm maps to a value between 0 and 1.
 
 Standardization, on the other hand, transforms the input values such that they follow a distribution with zero mean and unit variance. Mathematically, the transformation on the data points in a distribution with mean μ and standard deviation σ is given by:
 
-xstd​=σx−μ​
+$$
+x_{std} = \frac{x-\mu}{\sigma}
+$$xstd​=σx−μ​
 
 In practice, this process of *standardization* is also referred to as *normalization* (not to be confused with the normalization process discussed above). As part of the preprocessing step, you can add a layer that applies this transform to the input features so that they all have a similar distribution. In Keras, you can add a [normalization layer](https://keras.io/api/layers/preprocessing_layers/numerical/normalization/) that applies this transform to the input features.
 
@@ -90,17 +94,29 @@ To address this, batch normalization introduces two parameters: a scaling factor
 
 Putting it all together, we have the following steps for batch normalization. If x(k) is the pre-activation corresponding to the k-th neuron in a layer, we denote it by x to simplify notation.
 
-μb​=B1​i=1∑B​xi​ (1)
+$$
+\mu_b = \frac{1}{B}\sum_{i=1}^{B}x_i \text{}\text{ } (1)
+$$μb​=B1​i=1∑B​xi​ (1)
 
-σb2​=B1​i=1∑B​(xi​−μb​)2 (2)
+$$
+\sigma_b^2 = \frac{1}{B}\sum_{i=1}^{B}(x_i - \mu_b)^2 \text{}\text{ } (2)
+$$σb2​=B1​i=1∑B​(xi​−μb​)2 (2)
 
-xi​^​=σb2​​xi​−μb​​(3)
+$$
+\hat{x_i} = \frac{x_i - \mu_b}{\sqrt{\sigma_b^2}} \text{}\text{} (3)
+$$xi​^​=σb2​​xi​−μb​​(3)
 
-or xi​^​=σb2​+ϵ​xi​−μb​​ (3)
+$$
+or\text{ }\hat{x_i} = \frac{x_i - \mu_b}{\sqrt{\sigma_b^2 + \epsilon}} \text{}\text{ } (3)
+$$or xi​^​=σb2​+ϵ​xi​−μb​​ (3)
 
-Adding ϵ helps when σb2​ is small
+$$
+Adding\text{ }\epsilon\text{ }helps\text{ }when\text{ }\sigma_b^2\text{ }is\text{ }small
+$$Adding ϵ helps when σb2​ is small
 
-yi​=BN(xi​)=γ.xi​^​+β(4)
+$$
+y_i = \mathcal{BN}(x_i) = \gamma.\hat{x_i} + \beta \text{}\text{}(4)
+$$yi​=BN(xi​)=γ.xi​^​+β(4)
 
 ### Limitations of Batch Normalization
 
@@ -150,17 +166,29 @@ Here’s an example showing the computation of the mean and variance for layer n
 
 ![How Layer Normalization Works](https://cdn.sanity.io/images/vr8gru94/production/567b2a2d454f2da286ce3cbbe6ce4583a1e2417f-800x627.png)How Layer Normalization Works - An Example (Image by the author)
 
-μl​=d1​i=1∑d​xi​ (1)
+$$
+\mu_l = \frac{1}{d}\sum_{i=1}^{d}x_i \text{}\text{ } (1)
+$$μl​=d1​i=1∑d​xi​ (1)
 
-σl2​=d1​i=1∑d​(xi​−μl​)2 (2)
+$$
+\sigma_l^2 = \frac{1}{d}\sum_{i=1}^{d}(x_i - \mu_l)^2 \text{}\text{ } (2)
+$$σl2​=d1​i=1∑d​(xi​−μl​)2 (2)
 
-xi​^​=σl2​​xi​−μl​​ (3)
+$$
+\hat{x_i} = \frac{x_i - \mu_l}{\sqrt{\sigma_l^2}} \text{}\text{ } (3)
+$$xi​^​=σl2​​xi​−μl​​ (3)
 
-or xi​^​=σl2​+ϵ​xi​−μl​​ (3)
+$$
+or\text{ }\hat{x_i} = \frac{x_i - \mu_l}{\sqrt{\sigma_l^2 + \epsilon}} \text{}\text{ } (3)
+$$or xi​^​=σl2​+ϵ​xi​−μl​​ (3)
 
-Adding ϵ helps when σl2​ is small
+$$
+Adding\text{ }\epsilon\text{ }helps\text{ }when\text{ }\sigma_l^2\text{ }is\text{ }small
+$$Adding ϵ helps when σl2​ is small
 
-yi​=LN(xi​)=γ.xi​^​+β(4)
+$$
+y_i = \mathcal{LN}(x_i) = \gamma.\hat{x_i} + \beta \text{}\text{}(4)
+$$yi​=LN(xi​)=γ.xi​^​+β(4)
 
 From these steps, we see that they’re similar to the steps we had in batch normalization. However, instead of the batch statistics, we use the mean and variance corresponding to specific input to the neurons in a particular layer, say k. This is equivalent to normalizing the output vector from the layer k-1.
 

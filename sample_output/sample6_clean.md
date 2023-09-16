@@ -95,7 +95,9 @@ Normalization works by mapping all values of a
 feature to be in the range [0,1] using the
 transformation:
 
-xnorm​=xmax​−xmin​x−xmin​​
+$$
+x_{norm} = \frac{x-x_{min}}{x_{max}-x_{min}}
+$$xnorm​=xmax​−xmin​x−xmin​​
 
 Suppose a particular input feature x has
 values in the range [x\_min,
@@ -118,7 +120,9 @@ the transformation on the data points in a
 distribution with mean μ and standard deviation σ
 is given by:
 
-xstd​=σx−μ​
+$$
+x_{std} = \frac{x-\mu}{\sigma}
+$$xstd​=σx−μ​
 
 In practice, this process of
 *standardization* is also referred to as
@@ -247,17 +251,29 @@ is the pre-activation corresponding to the k-th
 neuron in a layer, we denote it by x to
 simplify notation.
 
-μb​=B1​i=1∑B​xi​ (1)
+$$
+\mu_b = \frac{1}{B}\sum_{i=1}^{B}x_i \text{}\text{ } (1)
+$$μb​=B1​i=1∑B​xi​ (1)
 
-σb2​=B1​i=1∑B​(xi​−μb​)2 (2)
+$$
+\sigma_b^2 = \frac{1}{B}\sum_{i=1}^{B}(x_i - \mu_b)^2 \text{}\text{ } (2)
+$$σb2​=B1​i=1∑B​(xi​−μb​)2 (2)
 
-xi​^​=σb2​​xi​−μb​​(3)
+$$
+\hat{x_i} = \frac{x_i - \mu_b}{\sqrt{\sigma_b^2}} \text{}\text{} (3)
+$$xi​^​=σb2​​xi​−μb​​(3)
 
-or xi​^​=σb2​+ϵ​xi​−μb​​ (3)
+$$
+or\text{ }\hat{x_i} = \frac{x_i - \mu_b}{\sqrt{\sigma_b^2 + \epsilon}} \text{}\text{ } (3)
+$$or xi​^​=σb2​+ϵ​xi​−μb​​ (3)
 
-Adding ϵ helps when σb2​ is small
+$$
+Adding\text{ }\epsilon\text{ }helps\text{ }when\text{ }\sigma_b^2\text{ }is\text{ }small
+$$Adding ϵ helps when σb2​ is small
 
-yi​=BN(xi​)=γ.xi​^​+β(4)
+$$
+y_i = \mathcal{BN}(x_i) = \gamma.\hat{x_i} + \beta \text{}\text{}(4)
+$$yi​=BN(xi​)=γ.xi​^​+β(4)
 
 ### Limitations of Batch Normalization
 
@@ -364,17 +380,29 @@ three input samples, each with four features.
 How Layer Normalization Works - An Example (Image
 by the author)
 
-μl​=d1​i=1∑d​xi​ (1)
+$$
+\mu_l = \frac{1}{d}\sum_{i=1}^{d}x_i \text{}\text{ } (1)
+$$μl​=d1​i=1∑d​xi​ (1)
 
-σl2​=d1​i=1∑d​(xi​−μl​)2 (2)
+$$
+\sigma_l^2 = \frac{1}{d}\sum_{i=1}^{d}(x_i - \mu_l)^2 \text{}\text{ } (2)
+$$σl2​=d1​i=1∑d​(xi​−μl​)2 (2)
 
-xi​^​=σl2​​xi​−μl​​ (3)
+$$
+\hat{x_i} = \frac{x_i - \mu_l}{\sqrt{\sigma_l^2}} \text{}\text{ } (3)
+$$xi​^​=σl2​​xi​−μl​​ (3)
 
-or xi​^​=σl2​+ϵ​xi​−μl​​ (3)
+$$
+or\text{ }\hat{x_i} = \frac{x_i - \mu_l}{\sqrt{\sigma_l^2 + \epsilon}} \text{}\text{ } (3)
+$$or xi​^​=σl2​+ϵ​xi​−μl​​ (3)
 
-Adding ϵ helps when σl2​ is small
+$$
+Adding\text{ }\epsilon\text{ }helps\text{ }when\text{ }\sigma_l^2\text{ }is\text{ }small
+$$Adding ϵ helps when σl2​ is small
 
-yi​=LN(xi​)=γ.xi​^​+β(4)
+$$
+y_i = \mathcal{LN}(x_i) = \gamma.\hat{x_i} + \beta \text{}\text{}(4)
+$$yi​=LN(xi​)=γ.xi​^​+β(4)
 
 From these steps, we see that they’re similar to
 the steps we had in batch normalization. However,
