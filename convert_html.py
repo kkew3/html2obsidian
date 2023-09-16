@@ -1023,9 +1023,16 @@ class StackMarkdownGenerator:
             for e in queue:
                 if isinstance(e, EndElement):
                     elements = []
-                    while (not isinstance(self.stack[-1], StartElement)
-                           or not self.stack[-1].paired_with(e)):
-                        elements.append(self.stack.pop())
+                    tag_counter = 0
+                    while not (isinstance(self.stack[-1], StartElement)
+                               and self.stack[-1].paired_with(e)
+                               and tag_counter == 0):
+                        next_e = self.stack.pop()
+                        if isinstance(next_e, StartElement):
+                            tag_counter += 1
+                        elif isinstance(next_e, EndElement):
+                            tag_counter -= 1
+                        elements.append(next_e)
                     elements.reverse()
                     start = self.stack.pop()
                     assert isinstance(start, StartElement), (e, start)
