@@ -82,6 +82,36 @@ def test_recognize_merge_whitespace():
     ]
 
 
+def test_regenerate_xml():
+    assert convert_html.regenerate_xml('math', {'id': 'SS1.p2.m3'}, [
+        convert_html.StartElement('msub'),
+        convert_html.StartElement('mi'),
+        'o',
+        convert_html.EndElement('mi'),
+        convert_html.StartElement('mn'),
+        '1',
+        convert_html.EndElement('mn'),
+        convert_html.EndElement('msub'),
+    ]) == '<math id="SS1.p2.m3"><msub><mi>o</mi><mn>1</mn></msub></math>'
+    assert convert_html.regenerate_xml('math', {}, [
+        convert_html.StartElement('mrow'),
+        convert_html.StartElement('mfrac'),
+        convert_html.StartElement('mrow'),
+        convert_html.StartElement('mi'),
+        'x',
+        convert_html.EndElement('mi'),
+        convert_html.EndElement('mrow'),
+        convert_html.StartElement('mrow'),
+        convert_html.StartElement('mi'),
+        'y',
+        convert_html.EndElement('mi'),
+        convert_html.EndElement('mrow'),
+        convert_html.EndElement('mfrac'),
+        convert_html.EndElement('mrow'),
+    ]) == ('<math><mrow><mfrac><mrow><mi>x</mi></mrow><mrow><mi>y</mi>'
+           '</mrow></mfrac></mrow></math>')
+
+
 def read_test_case(name: str):
     basedir = Path('test_cases')
     with open(basedir / (name + '.html'), encoding='utf-8') as infile:
@@ -262,6 +292,22 @@ class TestStackMarkdownGenerator:
 
     def test_unused_bookmark_hash(self):
         g, md = self._case('unused_bookmark_hash')
+        assert g.generate() == md
+
+    def test_mathml_inline(self):
+        g, md = self._case('mathml_inline')
+        assert g.generate() == md
+
+    def test_mathml_block(self):
+        g, md = self._case('mathml_block')
+        assert g.generate() == md
+
+    def test_mathml_no_xmlns(self):
+        g, md = self._case('mathml_no_xmlns')
+        assert g.generate() == md
+
+    def test_mathml_alttext(self):
+        g, md = self._case('mathml_alttext')
         assert g.generate() == md
 
     def _sample(self, name: str, url: str = None):

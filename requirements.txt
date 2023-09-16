@@ -1,4 +1,5 @@
-# lib itself: none
+# lib itself: none (without mathml parsing)
+# but mathml parsing will be automatically enabled if lxml is available
 
 # dev
 pytest

@@ -6,9 +6,19 @@ from pathlib import Path
 import re
 import functools
 from urllib.parse import urlparse
+from xml.etree import ElementTree as ET
+import importlib
 import warnings
 
 T = ty.TypeVar('T')
+
+
+def has(module: str):
+    try:
+        mod = importlib.import_module(module)
+    except (ImportError, ModuleNotFoundError):
+        return False
+    return mod
 
 
 class Pat:
@@ -198,6 +208,18 @@ class KeepOnlySupportedTarget:
             else:
                 self.nodes.append(StartElement(tag))
                 self.stack.append(tag)
+        # mathml (requiring lxml):
+        # See https://developer.mozilla.org/en-US/docs/Web/MathML/Element
+        elif has('lxml') and tag in [
+                'math', 'maction', 'annotation', 'annotation-xml', 'menclose',
+                'merror', 'mfenced', 'mfrac', 'mi', 'mmultiscripts', 'mn',
+                'mo', 'mover', 'mpadded', 'mphantom', 'mprescripts', 'mroot',
+                'mrow', 'ms', 'semantics', 'mspace', 'msqrt', 'mstyle', 'msub',
+                'msup', 'msubsup', 'mtable', 'mtd', 'mtext', 'mtr', 'munder',
+                'munderover'
+        ]:
+            self.nodes.append(StartElement(tag, attrib))
+            self.stack.append(tag)
         else:
             self.active = False
 
@@ -952,6 +974,56 @@ class RefContextEntry:
         self.used: bool = False
 
 
+def regenerate_xml(
+    root_tag: str,
+    attrib: ty.Dict[str, str],
+    elements: ty.List[SupportedElementType],
+) -> str:
+    """
+    Regenerate XML string from root tag and enclosing elements.
+
+    :param root_tag: the tag name
+    :param attrib: the attributes
+    :param elements: the enclosing elements
+    :return: the XML bytes
+    """
+    elements = elements.copy()
+    elements.insert(0, StartElement(root_tag, attrib))
+    elements.append(EndElement(root_tag))
+    stack = []
+    for e in elements:
+        if isinstance(e, EndElement):
+            enclosed = []
+            while not isinstance(stack[-1], StartElement):
+                enclosed.append(stack.pop())
+            enclosed.reverse()
+            parent = stack.pop()
+            curr = ET.Element(parent.tag, parent.attrib)
+            has_str = False
+            curr_text = []
+            for f in enclosed:
+                if isinstance(f, str):
+                    has_str = True
+                    curr_text.append(f)
+                elif isinstance(f, Whitespace):
+                    pass
+                elif has_str:
+                    raise ValueError('elements not an XML')
+                else:
+                    curr.append(f)
+            if has_str:
+                curr.text = ''.join(curr_text)
+            stack.append(curr)
+        else:
+            stack.append(e)
+    assert len(stack) == 1
+    return ET.tostring(stack[0], encoding='utf-8').decode('utf-8')
+
+
+class MathMLTexAnnotation(VerbText):
+    pass
+
+
 class StackMarkdownGenerator:
     default_options = {
         # bullet for <li> of <ul>; valid values: '-', '*', '+'
@@ -1036,7 +1108,8 @@ class StackMarkdownGenerator:
                     elements.reverse()
                     start = self.stack.pop()
                     assert isinstance(start, StartElement), (e, start)
-                    procf = getattr(self, 'proc_' + start.tag)
+                    procf_name = 'proc_' + start.tag.replace('-', '_')
+                    procf = getattr(self, procf_name)
                     parents = []
                     for p in reversed(self.stack):
                         if isinstance(p, StartElement):
@@ -2065,6 +2138,112 @@ class StackMarkdownGenerator:
                           'elements; passed as is')
             return as_text(res, 'pass')
 
+        return res
+
+    def _proc_nop(
+        self,
+        _attrib: ty.Dict[str, str],
+        _elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> None:
+        return None
+
+    proc_maction = _proc_nop
+    proc_annotation_xml = _proc_nop
+    proc_menclose = _proc_nop
+    proc_merror = _proc_nop
+    proc_mfenced = _proc_nop
+    proc_mfrac = _proc_nop
+    proc_mi = _proc_nop
+    proc_mmultiscripts = _proc_nop
+    proc_mn = _proc_nop
+    proc_mo = _proc_nop
+    proc_mover = _proc_nop
+    proc_mpadded = _proc_nop
+    proc_mphantom = _proc_nop
+    proc_mprescripts = _proc_nop
+    proc_mroot = _proc_nop
+    proc_mrow = _proc_nop
+    proc_ms = _proc_nop
+    proc_semantics = _proc_nop
+    proc_mspace = _proc_nop
+    proc_msqrt = _proc_nop
+    proc_mstyle = _proc_nop
+    proc_msub = _proc_nop
+    proc_msup = _proc_nop
+    proc_msubsup = _proc_nop
+    proc_mtable = _proc_nop
+    proc_mtd = _proc_nop
+    proc_mtext = _proc_nop
+    proc_mtr = _proc_nop
+    proc_munder = _proc_nop
+    proc_munderover = _proc_nop
+
+    def proc_annotation(
+        self,
+        attrib: ty.Dict[str, str],
+        elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> ty.Optional[ty.List[IntermediateElementType]]:
+        if attrib.get('encoding', '') == 'application/x-tex':
+            res = as_text(
+                elements,
+                'raise',
+                merge_whitespace=False,
+                eval_whitespace=True)
+            text = ''.join(e for e in res if isinstance(e, str)).strip()
+            return [MathMLTexAnnotation(text)]
+        return None
+
+    def proc_math(
+        self,
+        attrib: ty.Dict[str, str],
+        elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> ty.Optional[ty.List[IntermediateElementType]]:
+        from lxml import etree
+
+        elements = as_text(elements, 'raise', 'pass')
+        attrib = attrib.copy()
+        if 'xmlns' not in attrib:
+            attrib['xmlns'] = 'http://www.w3.org/1998/Math/MathML'
+        if 'display' not in attrib:
+            attrib['display'] = 'inline'
+        display = attrib['display']
+        if 'alttext' in attrib:
+            math_latex_str = attrib['alttext']
+        elif any(isinstance(e, MathMLTexAnnotation) for e in elements):
+            math_latex_str = str(
+                next(
+                    e for e in elements if isinstance(e, MathMLTexAnnotation)))
+        else:
+            # no hint at all, parse from scratch
+            mathml_str = regenerate_xml('math', attrib, elements)
+            dom = etree.fromstring(mathml_str)
+            xslt = etree.parse(
+                'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl')
+            transform = etree.XSLT(xslt)
+            math_latex_str = str(transform(dom)).strip()
+            if display == 'inline':
+                if math_latex_str.startswith('$'):
+                    math_latex_str = math_latex_str[1:].lstrip()
+                if math_latex_str.endswith('$'):
+                    math_latex_str = math_latex_str[:-1].rstrip()
+            elif display == 'block':
+                if math_latex_str.startswith('\\['):
+                    math_latex_str = math_latex_str[2:].lstrip()
+                if math_latex_str.endswith('\\]'):
+                    math_latex_str = math_latex_str[:-2].rstrip()
+        res = []
+        if display == 'inline':
+            res.append(InlineMath(math_latex_str))
+        elif display == 'block':
+            res.append(MathBlock(math_latex_str))
+        else:
+            warnings.warn(
+                'unknown attribute display={} in <math>; default to inline'
+                .format(display))
+            res.append(InlineMath(math_latex_str))
         return res
 
 

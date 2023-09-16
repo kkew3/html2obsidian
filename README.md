@@ -21,7 +21,7 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
   `<div>` (partial),
   `<code>`, `<samp>`, `<kbd>`,
   `<span>` (partial)
-- Math style support: `$...$`, `\(...\)`, `$$...$$`, `\[...\]` (mathml currently not supported)
+- Math style support: `$...$`, `\(...\)`, `$$...$$`, `\[...\]`, and MathML
 - Within-document link support
 - Within-site hyperlink/image support
 
@@ -30,6 +30,7 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
 This library requires `python>=3.6`.
 
 To install dependencies (please refer to `requirements.txt` for detail),
+in particular, MathML is supported only when `lxml` is installed.
 
 ```bash
 pip install -r requirements.txt
