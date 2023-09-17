@@ -2220,8 +2220,10 @@ class StackMarkdownGenerator:
             # no hint at all, parse from scratch
             mathml_str = regenerate_xml('math', attrib, elements)
             dom = etree.fromstring(mathml_str)
-            xslt = etree.parse(
-                'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl')
+            nmltex_file = str(
+                Path(__file__).parent
+                / 'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl')
+            xslt = etree.parse(nmltex_file)
             transform = etree.XSLT(xslt)
             math_latex_str = str(transform(dom)).strip()
             if display == 'inline':
