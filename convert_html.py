@@ -2304,7 +2304,7 @@ def _main():
         'write_base64_img_to',
     ]
     options = {k: getattr(args, k) for k in keys}
-    with open(args.html_file, encoding='utf-8') as infile:
+    with open(args.html_file, 'rb') as infile:
         html = infile.read()
     parser = etree.HTMLParser(target=KeepOnlySupportedTarget(True))
     elements = etree.HTML(html, parser)
