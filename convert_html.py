@@ -1128,7 +1128,7 @@ class StackMarkdownGenerator:
 
             # There may still be some raw math blocks in certain str nodes
             res1 = []
-            for e in self.stack:
+            for e in as_text(self.stack, 'pass', 'pass', eval_whitespace=True):
                 if isinstance(e, str):
                     res1.extend(search_slashsquare_math_block(e))
                 else:
