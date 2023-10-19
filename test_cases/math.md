@@ -1,4 +1,4 @@
-hello world $\sqrt{2}$ times.
+hello world $\sqrt{2}$ times $\mathbb R$.
 
 $$
 f = \max\{1, 2\}

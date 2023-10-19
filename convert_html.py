@@ -1249,8 +1249,15 @@ class StackMarkdownGenerator:
                 res2.extend(search_dollar_inline_math(e))
             else:
                 res2.append(e)
-        res3 = as_text(res2, phantom_policy='ignore')
-        return res3
+        res2 = as_text(res2, phantom_policy='warn', eval_whitespace=True)
+        res3 = []
+        for e in res2:
+            if isinstance(e, str):
+                res3.extend(search_slashparenthesis_inline_math(e))
+            else:
+                res3.append(e)
+        res4 = as_text(res3, phantom_policy='ignore')
+        return res4
 
     def _proc_headers(
         self,
