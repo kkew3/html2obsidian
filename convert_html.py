@@ -2115,7 +2115,7 @@ class StackMarkdownGenerator:
         All children must already be parsed.
         """
         if contains_unparsed_element(elements):
-            raise ValueError('<pre> contains unparsed element')
+            raise ValueError('<span> contains unparsed element')
 
         res = elements.copy()
 
