@@ -310,6 +310,10 @@ class TestStackMarkdownGenerator:
         g, md = self._case('mathml_alttext')
         assert g.generate() == md
 
+    def test_span_id(self):
+        g, md = self._case('span_id')
+        assert g.generate() == md
+
     def _sample(self, name: str, url: str = None):
         html = read_sample(name)
         elements = etree.HTML(

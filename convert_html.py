@@ -203,10 +203,12 @@ class KeepOnlySupportedTarget:
                     self.nodes.append(StartElement(tag, {'class': 'math'}))
                     self.stack.append(tag)
                 else:
-                    self.nodes.append(StartElement(tag))
+                    self.nodes.append(
+                        StartElement(tag, subset_dict(attrib, ['id'])))
                     self.stack.append(tag)
             else:
-                self.nodes.append(StartElement(tag))
+                self.nodes.append(
+                    StartElement(tag, subset_dict(attrib, ['id'])))
                 self.stack.append(tag)
         # mathml (requiring lxml):
         # See https://developer.mozilla.org/en-US/docs/Web/MathML/Element
@@ -2143,6 +2145,22 @@ class StackMarkdownGenerator:
 
             warnings.warn('<span class="math"> contains unexpected non-math '
                           'elements; passed as is')
+            return as_text(res, 'pass')
+
+        if 'id' in attrib:
+            res = as_text(elements, 'pass')
+
+            h = bookmark_hash(''.join(
+                as_text(
+                    res,
+                    'ignore',
+                    eval_local_href='elements',
+                    bookmark_hash_policy='ignore',
+                    eval_whitespace=True,
+                    eval_verb=True)))
+            self.ref_context[attrib['id']] = RefContextEntry('hash', h)
+            res.append(BookmarkHash(h))
+            res.append(LineBreak())
             return as_text(res, 'pass')
 
         return res
