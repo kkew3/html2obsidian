@@ -1176,6 +1176,7 @@ class StackMarkdownGenerator:
         res = []
         for e in self.stack:
             if isinstance(e, LocalHref) and e.ref is None:
+                warnings.warn('breaking tie on LocalHref {!r}'.format(e))
                 res.extend(e.elements)
             else:
                 res.append(e)
