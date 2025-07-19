@@ -7,7 +7,6 @@ from pathlib import Path
 import re
 import functools
 from urllib.parse import urlparse
-from xml.etree import ElementTree as ET
 import warnings
 import os
 import importlib.resources
@@ -15,6 +14,7 @@ import tempfile
 import shutil
 
 from lxml import etree
+from lxml.etree import Element
 
 T = ty.TypeVar('T')
 
@@ -1072,7 +1072,7 @@ def regenerate_xml(
                 enclosed.append(stack.pop())
             enclosed.reverse()
             parent = stack.pop()
-            curr = ET.Element(parent.tag, parent.attrib)
+            curr = Element(parent.tag, parent.attrib)
             has_str = False
             curr_text = []
             for f in enclosed:
@@ -1091,7 +1091,7 @@ def regenerate_xml(
         else:
             stack.append(e)
     assert len(stack) == 1
-    return ET.tostring(stack[0], encoding='utf-8').decode('utf-8')
+    return etree.tostring(stack[0], encoding='utf-8').decode('utf-8')
 
 
 class MathMLParser:
