@@ -6,7 +6,7 @@ setup(
     py_modules=['convert_html', 'test_convert_html'],
     python_requires='>=3.9',
     install_requires=[
-        'lxml==5.1.0',
+        'lxml>=5.1.0,<=6.0',
     ],
     extras_require={
         'dev': [
