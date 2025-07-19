@@ -2494,16 +2494,8 @@ class StackMarkdownGenerator:
         return res
 
 
-def _make_parser():
-    from pathlib import Path
-
-    args = argparse.ArgumentParser(
-        prog='html2obsidian',
-        description=(
-            'Convert an HTML file to Obsidian-style markdown '
-            'and write to stdout.'
-        ),
-    )
+def make_cli_parser(prog: str, description: str):
+    args = argparse.ArgumentParser(prog=prog, description=description)
     args.add_argument('--ul-bullet', dest='ul_bullet', choices=['-', '+', '*'])
     args.add_argument(
         '--strong-symbol', dest='strong_symbol', choices=['*', '_']
@@ -2553,7 +2545,10 @@ def _make_parser():
 
 
 def main():
-    args = _make_parser().parse_args()
+    description = (
+        'Convert an HTML file to Obsidian-style markdown and write to stdout.'
+    )
+    args = make_cli_parser('html2obsidian', description).parse_args()
     keys = [
         'ul_bullet',
         'strong_symbol',
