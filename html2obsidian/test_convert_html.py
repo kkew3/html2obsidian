@@ -2,7 +2,7 @@ from pathlib import Path
 
 from lxml import etree
 
-import convert_html
+from . import convert_html
 
 
 class TestKeepOnlySupportedTarget:
