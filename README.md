@@ -51,13 +51,51 @@ Check [sample_html](./sample_html) for example input html and [sample_output](./
 
 ### Run as executable
 
-To use the attached `__main__`, refer to
+Example usage:
+
+```bash
+curl -fsSL the-url | html2obsidian --url the-url - > output.md
+```
+
+For detailed help, refer to
 
 ```bash
 html2obsidian --help
 ```
 
-for help.
+which is quoted below for reference:
+
+```
+usage: html2obsidian [-h] [--ul-bullet {-,+,*}] [--strong-symbol {*,_}]
+                     [--em-symbol {*,_}] [--sub-start-symbol CHARS]
+                     [--sub-end-symbol CHARS] [--sup-start-symbol CHARS]
+                     [--sup-end-symbol CHARS] [--join] [--elevate-header-to N]
+                     [--indent-list-with-tab]
+                     [--write-base64-img-to WRITE_BASE64_IMG_TO] [--url URL]
+                     html_file
+
+Convert an HTML file to Obsidian-style markdown and write to stdout.
+
+positional arguments:
+  html_file             the html file to read; pass `-` to read from stdin
+
+options:
+  -h, --help            show this help message and exit
+  --ul-bullet {-,+,*}
+  --strong-symbol {*,_}
+  --em-symbol {*,_}
+  --sub-start-symbol CHARS
+  --sub-end-symbol CHARS
+  --sup-start-symbol CHARS
+  --sup-end-symbol CHARS
+  --join
+  --elevate-header-to N
+  --indent-list-with-tab
+  --write-base64-img-to WRITE_BASE64_IMG_TO
+  --url URL             url if the html is downloaded from web; this helps
+                        resolve within-doc link
+```
+
 Note that sometimes there are warnings issued, e.g.
 
 ```
