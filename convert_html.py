@@ -253,6 +253,7 @@ class KeepOnlySupportedTarget:
             self.active = False
 
     def end(self, tag):
+        tag = tag.lower()
         if self.stack and self.stack[-1] == tag:
             self.nodes.append(EndElement(tag))
             del self.stack[-1]
