@@ -1,3 +1,4 @@
 sample_html/* -linguist-detectable
 sample_output/* -linguist-detectable
 test_cases/* -linguist-detectable
+html2obsidian/xsltml_2.1.2/* -linguist-detectable
