@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='html2obsidian',
-    version='0.5.0',
+    version='0.5.1',
     packages=['html2obsidian'],
     package_data={
         'html2obsidian': ['xsltml_2.1.2/*.xsl'],
@@ -21,8 +21,4 @@ setup(
             'html2obsidian = html2obsidian.convert_html:main',
         ],
     },
-    scripts=[
-        'scripts/diagnose_convergence_issue.py',
-        'scripts/inline_xsl_docs.py',
-    ],
 )
