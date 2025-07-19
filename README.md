@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian][1]-style Markdown.
+This utility converts an HTML to [Obsidian][1]-style Markdown.
 
 ## Features
 
@@ -28,19 +28,12 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
 
 ## Installation
 
-This library requires `python>=3.6`.
+This library requires `python>=3.9`.
 
-To install dependencies (please refer to `requirements.txt` for detail),
-in particular, MathML is supported only when `lxml` is installed.
-
-```bash
-pip install -r requirements.txt
-```
-
-or
+To install dependencies:
 
 ```bash
-conda install pytest lxml
+pip install -e .
 ```
 
 ## Usage
@@ -50,7 +43,7 @@ conda install pytest lxml
 To use the attached `__main__`, refer to
 
 ```bash
-python3 convert_html.py --help
+html2obsidian --help
 ```
 
 for help.
@@ -63,7 +56,7 @@ Note that sometimes there are warnings issued, e.g.
 
 Most of the time, however, it does not imply errors in conversion.
 
-### Use the library
+### Use as a library
 
 ```python
 from lxml import etree
