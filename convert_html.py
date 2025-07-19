@@ -7,18 +7,11 @@ import re
 import functools
 from urllib.parse import urlparse
 from xml.etree import ElementTree as ET
-import importlib
 import warnings
 
+from lxml import etree
+
 T = ty.TypeVar('T')
-
-
-def has(module: str):
-    try:
-        mod = importlib.import_module(module)
-    except (ImportError, ModuleNotFoundError):
-        return False
-    return mod
 
 
 class Pat:
@@ -220,7 +213,7 @@ class KeepOnlySupportedTarget:
                 self.stack.append(tag)
         # mathml (requiring lxml):
         # See https://developer.mozilla.org/en-US/docs/Web/MathML/Element
-        elif has('lxml') and tag in [
+        elif tag in [
             'math',
             'maction',
             'annotation',
@@ -2381,8 +2374,6 @@ class StackMarkdownGenerator:
         elements: ty.List[IntermediateElementType],
         _parents: ty.List[StartElement],
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
-        from lxml import etree
-
         elements = as_text(elements, 'raise', 'pass')
         attrib = attrib.copy()
         if 'xmlns' not in attrib:
@@ -2481,8 +2472,6 @@ def _make_parser():
 
 
 def _main():
-    from lxml import etree
-
     args = _make_parser().parse_args()
     keys = [
         'ul_bullet',
