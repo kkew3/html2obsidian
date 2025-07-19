@@ -28,12 +28,19 @@ This utility converts an HTML to [Obsidian][1]-style Markdown.
 
 ## Installation
 
-This library requires `python>=3.9`.
+This utility requires `python>=3.9`.
 
 To install:
 
 ```bash
+git clone https://github.com/kkew3/html2obsidian.git && cd html2obsidian
 pip install -e .
+```
+
+or use [`uv`](https://docs.astral.sh/uv/) (recommended):
+
+```bash
+uv tool install git+https://github.com/kkew3/html2obsidian.git
 ```
 
 ## Usage
