@@ -43,6 +43,10 @@ or use [`uv`](https://docs.astral.sh/uv/) (recommended):
 uv tool install git+https://github.com/kkew3/html2obsidian.git
 ```
 
+## Examples
+
+Check [sample_html](./sample_html) for example input html and [sample_output](./sample_output) for corresponding output markdown.
+
 ## Usage
 
 ### Run as executable
