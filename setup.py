@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='html2obsidian',
-    version='0.4.0',
+    version='0.5.0',
     packages=['html2obsidian'],
     package_data={
         'html2obsidian': ['xsltml_2.1.2/*.xsl'],
