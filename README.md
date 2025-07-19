@@ -109,7 +109,7 @@ Most of the time, however, it does not imply errors in conversion.
 
 ```python
 from lxml import etree
-import convert_html
+from html2obsidian import convert_html
 
 html_file = ...
 options = ...  # may be empty dict
