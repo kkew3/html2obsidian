@@ -21,4 +21,7 @@ setup(
             'html2obsidian = html2obsidian.convert_html:main',
         ],
     },
+    scripts=[
+        'scripts/diagnose_convergence_issue.py',
+    ],
 )
