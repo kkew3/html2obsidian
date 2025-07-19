@@ -2460,7 +2460,8 @@ def _make_parser():
     from pathlib import Path
 
     args = argparse.ArgumentParser(
-        description='Convert an HTML file to Obsidian markdown.'
+        prog='html2obsidian',
+        description='Convert an HTML file to Obsidian markdown.',
     )
     args.add_argument('--ul-bullet', dest='ul_bullet', choices=['-', '+', '*'])
     args.add_argument(
@@ -2504,7 +2505,7 @@ def _make_parser():
     return args
 
 
-def _main():
+def main():
     args = _make_parser().parse_args()
     keys = [
         'ul_bullet',
@@ -2527,7 +2528,3 @@ def _main():
     output = StackMarkdownGenerator(options, elements, args.url).generate()
     with open(args.output_file, 'w', encoding='utf-8') as outfile:
         outfile.write(output)
-
-
-if __name__ == '__main__':
-    _main()

@@ -13,4 +13,9 @@ setup(
             'pytest>=8.2.0,<9.0',
         ],
     },
+    entry_points={
+        'console_scripts': [
+            'html2obsidian = convert_html:main',
+        ],
+    },
 )
