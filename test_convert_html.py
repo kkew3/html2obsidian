@@ -5,13 +5,15 @@ from lxml import etree
 import convert_html
 
 
-class TestKeepOnlySupportedTarget():
+class TestKeepOnlySupportedTarget:
     def test_known_unknown_known(self):
         html = '<p>hello <foo>world <p>again</p></foo>!</p><bar>hola</bar>'
         parser = etree.HTMLParser(
-            target=convert_html.KeepOnlySupportedTarget(True))
+            target=convert_html.KeepOnlySupportedTarget(True)
+        )
         elements = convert_html.as_text(
-            etree.HTML(html, parser), 'pass', 'pass')
+            etree.HTML(html, parser), 'pass', 'pass'
+        )
         assert elements == [
             convert_html.StartElement('p'),
             'hello',
@@ -26,9 +28,11 @@ class TestKeepOnlySupportedTarget():
     def test_unknown_known_unknown(self):
         html = '<foo>hello <p>world <bar>again</bar>!</p></foo><baz>hola</baz>'
         parser = etree.HTMLParser(
-            target=convert_html.KeepOnlySupportedTarget(True))
+            target=convert_html.KeepOnlySupportedTarget(True)
+        )
         elements = convert_html.as_text(
-            etree.HTML(html, parser), 'pass', 'pass')
+            etree.HTML(html, parser), 'pass', 'pass'
+        )
         assert elements == [
             convert_html.StartElement('p'),
             'world',
@@ -43,73 +47,94 @@ def merge_eq(e1, e2):
 
 
 def test_stack_merge():
-    assert convert_html.stack_merge(['a', 'b', 'c'],
-                                    merge_eq) == ['a', 'b', 'c']
-    assert convert_html.stack_merge(['a', 'b', 'b', 'c', 'c', 'c'],
-                                    merge_eq) == ['a', 'b', 'c']
-    assert convert_html.stack_merge(['a', 'a', 'a', 'c', 'b', 'b'],
-                                    merge_eq) == ['a', 'c', 'b']
+    assert convert_html.stack_merge(['a', 'b', 'c'], merge_eq) == [
+        'a',
+        'b',
+        'c',
+    ]
+    assert convert_html.stack_merge(
+        ['a', 'b', 'b', 'c', 'c', 'c'], merge_eq
+    ) == ['a', 'b', 'c']
+    assert convert_html.stack_merge(
+        ['a', 'a', 'a', 'c', 'b', 'b'], merge_eq
+    ) == ['a', 'c', 'b']
 
 
 def test_stop_merging_on_seen():
-    assert convert_html.stack_merge(['a', 'a', 'a', 'c', 'b', 'b'],
-                                    convert_html.stop_merging_on_seen(
-                                        'c',
-                                        merge_eq)) == ['a', 'c', 'b', 'b']
+    assert convert_html.stack_merge(
+        ['a', 'a', 'a', 'c', 'b', 'b'],
+        convert_html.stop_merging_on_seen('c', merge_eq),
+    ) == ['a', 'c', 'b', 'b']
 
 
 def test_as_text():
-    assert (convert_html.as_text(['abc ', ' ', '  ghi'],
-                                 'ignore',
-                                 eval_whitespace=True) == ['abc ghi'])
-    assert convert_html.as_text(['abc ',
-                                 convert_html.InlineCode('de  '), 'f'],
-                                'ignore',
-                                eval_whitespace=True,
-                                eval_verb=True) == ['abc `de  `f']
-    assert convert_html.as_text(['abc\n  def'],
-                                'ignore',
-                                merge_whitespace=False,
-                                eval_whitespace=True) == ['abc\n  def']
+    assert convert_html.as_text(
+        ['abc ', ' ', '  ghi'], 'ignore', eval_whitespace=True
+    ) == ['abc ghi']
+    assert convert_html.as_text(
+        ['abc ', convert_html.InlineCode('de  '), 'f'],
+        'ignore',
+        eval_whitespace=True,
+        eval_verb=True,
+    ) == ['abc `de  `f']
+    assert convert_html.as_text(
+        ['abc\n  def'], 'ignore', merge_whitespace=False, eval_whitespace=True
+    ) == ['abc\n  def']
 
 
 def test_recognize_merge_whitespace():
     assert convert_html.recognize_merge_whitespace('a  b\n  c \n\n\n d') == [
         'a',
-        convert_html.Space(), 'b',
-        convert_html.Newline(), 'c',
-        convert_html.LineBreak(), 'd'
+        convert_html.Space(),
+        'b',
+        convert_html.Newline(),
+        'c',
+        convert_html.LineBreak(),
+        'd',
     ]
 
 
 def test_regenerate_xml():
-    assert convert_html.regenerate_xml('math', {'id': 'SS1.p2.m3'}, [
-        convert_html.StartElement('msub'),
-        convert_html.StartElement('mi'),
-        'o',
-        convert_html.EndElement('mi'),
-        convert_html.StartElement('mn'),
-        '1',
-        convert_html.EndElement('mn'),
-        convert_html.EndElement('msub'),
-    ]) == '<math id="SS1.p2.m3"><msub><mi>o</mi><mn>1</mn></msub></math>'
-    assert convert_html.regenerate_xml('math', {}, [
-        convert_html.StartElement('mrow'),
-        convert_html.StartElement('mfrac'),
-        convert_html.StartElement('mrow'),
-        convert_html.StartElement('mi'),
-        'x',
-        convert_html.EndElement('mi'),
-        convert_html.EndElement('mrow'),
-        convert_html.StartElement('mrow'),
-        convert_html.StartElement('mi'),
-        'y',
-        convert_html.EndElement('mi'),
-        convert_html.EndElement('mrow'),
-        convert_html.EndElement('mfrac'),
-        convert_html.EndElement('mrow'),
-    ]) == ('<math><mrow><mfrac><mrow><mi>x</mi></mrow><mrow><mi>y</mi>'
-           '</mrow></mfrac></mrow></math>')
+    assert (
+        convert_html.regenerate_xml(
+            'math',
+            {'id': 'SS1.p2.m3'},
+            [
+                convert_html.StartElement('msub'),
+                convert_html.StartElement('mi'),
+                'o',
+                convert_html.EndElement('mi'),
+                convert_html.StartElement('mn'),
+                '1',
+                convert_html.EndElement('mn'),
+                convert_html.EndElement('msub'),
+            ],
+        )
+        == '<math id="SS1.p2.m3"><msub><mi>o</mi><mn>1</mn></msub></math>'
+    )
+    assert convert_html.regenerate_xml(
+        'math',
+        {},
+        [
+            convert_html.StartElement('mrow'),
+            convert_html.StartElement('mfrac'),
+            convert_html.StartElement('mrow'),
+            convert_html.StartElement('mi'),
+            'x',
+            convert_html.EndElement('mi'),
+            convert_html.EndElement('mrow'),
+            convert_html.StartElement('mrow'),
+            convert_html.StartElement('mi'),
+            'y',
+            convert_html.EndElement('mi'),
+            convert_html.EndElement('mrow'),
+            convert_html.EndElement('mfrac'),
+            convert_html.EndElement('mrow'),
+        ],
+    ) == (
+        '<math><mrow><mfrac><mrow><mi>x</mi></mrow><mrow><mi>y</mi>'
+        '</mrow></mfrac></mrow></math>'
+    )
 
 
 def read_test_case(name: str):
@@ -133,8 +158,8 @@ class TestStackMarkdownGenerator:
         html, md = read_test_case(name)
         elements = etree.HTML(
             html,
-            etree.HTMLParser(
-                target=convert_html.KeepOnlySupportedTarget(True)))
+            etree.HTMLParser(target=convert_html.KeepOnlySupportedTarget(True)),
+        )
         if options is None:
             options = {}
         return convert_html.StackMarkdownGenerator(options, elements), md
@@ -200,8 +225,9 @@ class TestStackMarkdownGenerator:
         assert g.generate() == md
 
     def test_header_to_elevate(self):
-        g, md = self._case('header_to_elevate',
-                           {'try_make_highest_header_hn': 1})
+        g, md = self._case(
+            'header_to_elevate', {'try_make_highest_header_hn': 1}
+        )
         assert g.generate() == md
 
     def test_header_self_reference(self):
@@ -318,15 +344,15 @@ class TestStackMarkdownGenerator:
         html = read_sample(name)
         elements = etree.HTML(
             html,
-            etree.HTMLParser(
-                target=convert_html.KeepOnlySupportedTarget(True)))
+            etree.HTMLParser(target=convert_html.KeepOnlySupportedTarget(True)),
+        )
         convert_html.StackMarkdownGenerator({}, elements, url).generate()
 
     def test_sample1_validity(self):
         self._sample('sample1')
         self._sample(
             'sample1',
-            'https://timvieira.github.io/blog/post/2017/08/18/backprop-is-not-just-the-chain-rule/'
+            'https://timvieira.github.io/blog/post/2017/08/18/backprop-is-not-just-the-chain-rule/',
         )
 
     def test_sample2_validity(self):
@@ -337,19 +363,20 @@ class TestStackMarkdownGenerator:
         self._sample('sample3')
         self._sample(
             'sample3',
-            'https://timvieira.github.io/blog/post/2017/04/21/how-to-test-gradient-implementations/'
+            'https://timvieira.github.io/blog/post/2017/04/21/how-to-test-gradient-implementations/',
         )
 
     def test_sample4_validity(self):
         self._sample('sample4')
-        self._sample('sample4',
-                     'https://qnscholar.github.io//2021-12/zotero-if/')
+        self._sample(
+            'sample4', 'https://qnscholar.github.io//2021-12/zotero-if/'
+        )
 
     def test_sample5_validity(self):
         self._sample('sample5')
         self._sample(
             'sample5',
-            'https://timvieira.github.io/blog/post/2014/02/12/visualizing-high-dimensional-functions-with-cross-sections/'
+            'https://timvieira.github.io/blog/post/2014/02/12/visualizing-high-dimensional-functions-with-cross-sections/',
         )
 
     # There might be a warning in this test. It's not a bug.
@@ -357,5 +384,5 @@ class TestStackMarkdownGenerator:
         self._sample('sample6_clean')
         self._sample(
             'sample6_clean',
-            'https://www.pinecone.io/learn/batch-layer-normalization/#Why-Should-You-Normalize-Inputs-in-a-Neural-Network'
+            'https://www.pinecone.io/learn/batch-layer-normalization/#Why-Should-You-Normalize-Inputs-in-a-Neural-Network',
         )

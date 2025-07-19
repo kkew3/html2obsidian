@@ -27,7 +27,8 @@ class Pat:
     linebreak = re.compile(r'\n{2,}')
     slashsquare_math_block = re.compile(r'(\\\[|\\])', flags=re.MULTILINE)
     slashparenthesis_inline_math = re.compile(
-        r'(\\\(|\\\))', flags=re.MULTILINE)
+        r'(\\\(|\\\))', flags=re.MULTILINE
+    )
     dollar_inline_math = re.compile(r'\$[^$\s][^$]*[^$\s]\$|\$[^$\s]\$')
 
 
@@ -74,7 +75,8 @@ class StartElement:
 
     def __repr__(self):
         return 'StartElement(tag={!r}, attrib={!r})'.format(
-            self.tag, self.attrib)
+            self.tag, self.attrib
+        )
 
 
 class EndElement:
@@ -109,6 +111,7 @@ class KeepOnlySupportedTarget:
     """
     This target keeps only supported elements.
     """
+
     def __init__(self, strict: bool):
         self.strict = strict
         self.nodes: ty.List[SupportedElementType] = []
@@ -134,8 +137,7 @@ class KeepOnlySupportedTarget:
             self.nodes.append(StartElement(tag))
             self.stack.append(tag)
         elif tag == 'ol':
-            self.nodes.append(
-                StartElement(tag, subset_dict(attrib, ['start'])))
+            self.nodes.append(StartElement(tag, subset_dict(attrib, ['start'])))
             self.stack.append(tag)
         # paragraphs
         elif tag == 'p':
@@ -144,7 +146,8 @@ class KeepOnlySupportedTarget:
         # anchors
         elif tag == 'a':
             self.nodes.append(
-                StartElement(tag, subset_dict(attrib, ['id', 'href'])))
+                StartElement(tag, subset_dict(attrib, ['id', 'href']))
+            )
             self.stack.append(tag)
         # quotes
         elif tag == 'blockquote':
@@ -157,7 +160,8 @@ class KeepOnlySupportedTarget:
         # figures
         elif tag == 'img':
             self.nodes.append(
-                StartElement(tag, subset_dict(attrib, ['src', 'alt'])))
+                StartElement(tag, subset_dict(attrib, ['src', 'alt']))
+            )
             self.stack.append(tag)
         # basic text layout
         elif tag in ['b', 'strong', 'i', 'em', 'mark', 'del', 's']:
@@ -186,12 +190,14 @@ class KeepOnlySupportedTarget:
                 # misc
                 else:
                     self.nodes.append(
-                        StartElement(tag, subset_dict(attrib, ['id'])))
+                        StartElement(tag, subset_dict(attrib, ['id']))
+                    )
                     self.stack.append(tag)
             # misc
             else:
                 self.nodes.append(
-                    StartElement(tag, subset_dict(attrib, ['id'])))
+                    StartElement(tag, subset_dict(attrib, ['id']))
+                )
                 self.stack.append(tag)
         elif tag in ['code', 'samp', 'kbd']:
             self.nodes.append(StartElement(tag, attrib))
@@ -204,21 +210,49 @@ class KeepOnlySupportedTarget:
                     self.stack.append(tag)
                 else:
                     self.nodes.append(
-                        StartElement(tag, subset_dict(attrib, ['id'])))
+                        StartElement(tag, subset_dict(attrib, ['id']))
+                    )
                     self.stack.append(tag)
             else:
                 self.nodes.append(
-                    StartElement(tag, subset_dict(attrib, ['id'])))
+                    StartElement(tag, subset_dict(attrib, ['id']))
+                )
                 self.stack.append(tag)
         # mathml (requiring lxml):
         # See https://developer.mozilla.org/en-US/docs/Web/MathML/Element
         elif has('lxml') and tag in [
-                'math', 'maction', 'annotation', 'annotation-xml', 'menclose',
-                'merror', 'mfenced', 'mfrac', 'mi', 'mmultiscripts', 'mn',
-                'mo', 'mover', 'mpadded', 'mphantom', 'mprescripts', 'mroot',
-                'mrow', 'ms', 'semantics', 'mspace', 'msqrt', 'mstyle', 'msub',
-                'msup', 'msubsup', 'mtable', 'mtd', 'mtext', 'mtr', 'munder',
-                'munderover'
+            'math',
+            'maction',
+            'annotation',
+            'annotation-xml',
+            'menclose',
+            'merror',
+            'mfenced',
+            'mfrac',
+            'mi',
+            'mmultiscripts',
+            'mn',
+            'mo',
+            'mover',
+            'mpadded',
+            'mphantom',
+            'mprescripts',
+            'mroot',
+            'mrow',
+            'ms',
+            'semantics',
+            'mspace',
+            'msqrt',
+            'mstyle',
+            'msub',
+            'msup',
+            'msubsup',
+            'mtable',
+            'mtd',
+            'mtext',
+            'mtr',
+            'munder',
+            'munderover',
         ]:
             self.nodes.append(StartElement(tag, attrib))
             self.stack.append(tag)
@@ -250,6 +284,7 @@ class KeepOnlySupportedTarget:
 
 class PhantomElement:
     """Represents a partially resolved element."""
+
     def __eq__(self, other):
         return type(self) is type(other)
 
@@ -279,16 +314,19 @@ class MdList(PhantomElement):
 
 class MdListItemIndentPointAtBullet(PhantomElement):
     """Should be replaced by proper indentation"""
+
     __slots__ = []
 
 
 class MdLIstItemIndentPointOtherwise(PhantomElement):
     """Should be replaced by proper indentation"""
+
     __slots__ = []
 
 
 class MdListItemBullet(PhantomElement):
     """Should be replaced by bullet"""
+
     __slots__ = []
 
 
@@ -313,6 +351,7 @@ class VerbText:
     """
     Group of text free from being escaped.
     """
+
     __slots__ = ['text']
 
     def __init__(self, text: str):
@@ -354,7 +393,7 @@ def search_dollar_inline_math(text: str) -> ty.List[ty.Union[str, InlineMath]]:
     start = 0
     for m in Pat.dollar_inline_math.finditer(text):
         if start < m.start():
-            res.append(text[start:m.start()])
+            res.append(text[start : m.start()])
         res.append(InlineMath(m.group()[1:-1]))
         start = m.end()
     if start < len(text):
@@ -363,13 +402,17 @@ def search_dollar_inline_math(text: str) -> ty.List[ty.Union[str, InlineMath]]:
 
 
 def search_slashparenthesis_inline_math(
-        text: str) -> ty.List[ty.Union[str, InlineMath]]:
+    text: str,
+) -> ty.List[ty.Union[str, InlineMath]]:
     tokens = Pat.slashparenthesis_inline_math.split(text)
     res = []
     i = 0
     while i < len(tokens):
-        if (tokens[i] == '\\(' and i + 2 < len(tokens)
-                and tokens[i + 2] == '\\)'):
+        if (
+            tokens[i] == '\\('
+            and i + 2 < len(tokens)
+            and tokens[i + 2] == '\\)'
+        ):
             res.append(InlineMath(tokens[i + 1].strip()))
             i += 3
         else:
@@ -389,13 +432,17 @@ class MathBlock(VerbText):
 
 
 def search_slashsquare_math_block(
-        text: str) -> ty.List[ty.Union[str, MathBlock]]:
+    text: str,
+) -> ty.List[ty.Union[str, MathBlock]]:
     tokens = Pat.slashsquare_math_block.split(text)
     res = []
     i = 0
     while i < len(tokens):
-        if (tokens[i] == '\\[' and i + 2 < len(tokens)
-                and tokens[i + 2] == '\\]'):
+        if (
+            tokens[i] == '\\['
+            and i + 2 < len(tokens)
+            and tokens[i + 2] == '\\]'
+        ):
             res.append(MathBlock(tokens[i + 1]))
             i += 3
         else:
@@ -431,8 +478,9 @@ class HeaderHashes(VerbText):
     def __init__(self, text: str):
         super().__init__(text)
         if set(self.text) != {'#'}:
-            raise ValueError('invalid characters in HeaderHashes: {}'.format(
-                self.text))
+            raise ValueError(
+                'invalid characters in HeaderHashes: {}'.format(self.text)
+            )
 
     @property
     def n(self):
@@ -491,8 +539,9 @@ def lstrip_whitespace(
         strip_type = [strip_type]
     for t in strip_type:
         if not issubclass(t, Whitespace):
-            raise TypeError('strip_type ({}) is not Whitespace'.format(
-                strip_type.__name__))
+            raise TypeError(
+                'strip_type ({}) is not Whitespace'.format(strip_type.__name__)
+            )
     stripped_elements = []
     i = index_beg(elements)
     while i is not None and isinstance(elements[i], tuple(strip_type)):
@@ -517,8 +566,9 @@ def rstrip_whitespace(
         strip_type = [strip_type]
     for t in strip_type:
         if not issubclass(t, Whitespace):
-            raise TypeError('strip_type ({}) is not Whitespace'.format(
-                strip_type.__name__))
+            raise TypeError(
+                'strip_type ({}) is not Whitespace'.format(strip_type.__name__)
+            )
     stripped_elements = []
     i = index_end(elements)
     while i is not None and isinstance(elements[i], tuple(strip_type)):
@@ -552,8 +602,9 @@ def index_end(elements) -> ty.Optional[int]:
 
 def stack_merge(
     elements: ty.List[T],
-    rule: ty.Callable[[ty.Optional[T], T], ty.Union[None, T,
-                                                    ty.List[ty.Optional[T]]]],
+    rule: ty.Callable[
+        [ty.Optional[T], T], ty.Union[None, T, ty.List[ty.Optional[T]]]
+    ],
 ) -> ty.List[T]:
     """
     :param elements: elements to merge
@@ -590,6 +641,7 @@ def stop_merging_on_seen(
     rule: ty.Callable,
 ) -> ty.Callable:
     """The ``rule`` perform merging before seen the ``stop_instance``."""
+
     class _StoppableRule:
         def __init__(self):
             self.seen_stop_instance = False
@@ -662,14 +714,13 @@ def recognize_whitespace(text: str) -> ty.List[ty.Union[str, Whitespace]]:
     return res
 
 
-def recognize_merge_whitespace(
-        text: str) -> ty.List[ty.Union[str, Whitespace]]:
+def recognize_merge_whitespace(text: str) -> ty.List[ty.Union[str, Whitespace]]:
     # recognize linebreaks
     res1 = []
     start = 0
     for m in Pat.linebreak.finditer(text):
         if start < m.start():
-            res1.append(text[start:m.start()])
+            res1.append(text[start : m.start()])
         res1.append(LineBreak())
         start = m.end()
     if start < len(text):
@@ -681,7 +732,7 @@ def recognize_merge_whitespace(
             start = 0
             for m in Pat.newline.finditer(text):
                 if start < m.start():
-                    res2.append(text[start:m.start()])
+                    res2.append(text[start : m.start()])
                 res2.append(Newline())
                 start = m.end()
             if start < len(text):
@@ -695,7 +746,7 @@ def recognize_merge_whitespace(
             start = 0
             for m in Pat.whitespace.finditer(text):
                 if start < m.start():
-                    res3.append(text[start:m.start()])
+                    res3.append(text[start : m.start()])
                 res3.append(Space())
                 start = m.end()
             if start < len(text):
@@ -712,10 +763,12 @@ class LocalHref:
     Represents the text part of an <a> tag referencing a within-document
     location.
     """
+
     __slots__ = ['elements', 'href', 'ref']
 
-    def __init__(self, elements: ty.List[ty.Union[str, VerbText, Whitespace]],
-                 href: str):
+    def __init__(
+        self, elements: ty.List[ty.Union[str, VerbText, Whitespace]], href: str
+    ):
         """
         :param elements: children elements
         :param href: the href without the leading '#'
@@ -726,7 +779,8 @@ class LocalHref:
 
     def __repr__(self):
         return '{}(href={!r}, ref={!r}, elements={!r})'.format(
-            type(self).__name__, self.href, self.ref, self.elements)
+            type(self).__name__, self.href, self.ref, self.elements
+        )
 
     def as_text(self):
         if self.ref is None:
@@ -750,9 +804,14 @@ class BookmarkHash:
         return ' ^' + self.hash_
 
 
-IntermediateElementType = ty.Union[SupportedElementType, PhantomElement,
-                                   VerbText, Whitespace, LocalHref,
-                                   BookmarkHash]
+IntermediateElementType = ty.Union[
+    SupportedElementType,
+    PhantomElement,
+    VerbText,
+    Whitespace,
+    LocalHref,
+    BookmarkHash,
+]
 
 
 def resolve_local_hrefs(
@@ -804,8 +863,9 @@ def as_text(
     tag_policy: ty.Literal['pass', 'raise'] = 'raise',
     merge_whitespace: bool = True,
     eval_local_href: ty.Literal['elements', 'text'] = False,
-    bookmark_hash_policy: ty.Literal['pass', 'ignore', 'eval',
-                                     'raise'] = 'pass',
+    bookmark_hash_policy: ty.Literal[
+        'pass', 'ignore', 'eval', 'raise'
+    ] = 'pass',
     eval_whitespace: bool = False,
     escape_text: bool = False,
     eval_verb: bool = False,
@@ -896,7 +956,8 @@ def as_text(
         del res3_2
     elif eval_local_href:
         raise ValueError(
-            'invalid eval_local_href value: {}'.format(eval_local_href))
+            'invalid eval_local_href value: {}'.format(eval_local_href)
+        )
     if bookmark_hash_policy == 'pass':
         pass
     elif bookmark_hash_policy == 'ignore':
@@ -908,7 +969,8 @@ def as_text(
             raise TypeError('unexpected BookmarkHash encountered')
     else:
         raise ValueError(
-            'invalid bookmark_hash_policy: {}'.format(bookmark_hash_policy))
+            'invalid bookmark_hash_policy: {}'.format(bookmark_hash_policy)
+        )
     if eval_whitespace:
         res3 = [str(e) if isinstance(e, Whitespace) else e for e in res3]
     if escape_text:
@@ -931,15 +993,18 @@ def check_converged(elements: ty.List[IntermediateElementType]) -> bool:
     ``VerbTect`` and ``Whitespace``.
     """
     for e in elements:
-        if not (isinstance(e, (str, VerbText, Whitespace, PhantomElement)) or
-                (isinstance(e, LocalHref) and e.ref is not None)
-                or isinstance(e, BookmarkHash)):
+        if not (
+            isinstance(e, (str, VerbText, Whitespace, PhantomElement))
+            or (isinstance(e, LocalHref) and e.ref is not None)
+            or isinstance(e, BookmarkHash)
+        ):
             return False
     return True
 
 
 def contains_unparsed_element(
-        elements: ty.List[IntermediateElementType]) -> bool:
+    elements: ty.List[IntermediateElementType],
+) -> bool:
     return any(isinstance(e, (StartElement, EndElement)) for e in elements)
 
 
@@ -1098,9 +1163,11 @@ class StackMarkdownGenerator:
                 if isinstance(e, EndElement):
                     elements = []
                     tag_counter = 0
-                    while not (isinstance(self.stack[-1], StartElement)
-                               and self.stack[-1].paired_with(e)
-                               and tag_counter == 0):
+                    while not (
+                        isinstance(self.stack[-1], StartElement)
+                        and self.stack[-1].paired_with(e)
+                        and tag_counter == 0
+                    ):
                         next_e = self.stack.pop()
                         if isinstance(next_e, StartElement):
                             tag_counter += 1
@@ -1158,8 +1225,9 @@ class StackMarkdownGenerator:
                             return [e1, e2]
                         return None
 
-                    self.stack = stack_merge(self.stack,
-                                             decrease_header_level_rule)
+                    self.stack = stack_merge(
+                        self.stack, decrease_header_level_rule
+                    )
 
         # (attempt to) ensure no duplicate newline at EOF
         rstrip_whitespace(self.stack, [LineBreak, Newline])
@@ -1177,17 +1245,23 @@ class StackMarkdownGenerator:
                 bookmark_hash_policy='raise',
                 eval_whitespace=True,
                 escape_text=True,
-                eval_verb=True))
+                eval_verb=True,
+            )
+        )
 
     def try_resolve_local_link(self, url: str):
         if self.page_url_info:
             url_info = urlparse(url)
             if not url_info.scheme and not url_info.netloc:
                 if url.startswith('/'):
-                    return '{}://{}{}'.format(self.page_url_info.scheme,
-                                              self.page_url_info.netloc, url)
-                return '{}://{}/{}'.format(self.page_url_info.scheme,
-                                           self.page_url_info.netloc, url)
+                    return '{}://{}{}'.format(
+                        self.page_url_info.scheme,
+                        self.page_url_info.netloc,
+                        url,
+                    )
+                return '{}://{}/{}'.format(
+                    self.page_url_info.scheme, self.page_url_info.netloc, url
+                )
         return url
 
     def proc_hr(
@@ -1221,14 +1295,18 @@ class StackMarkdownGenerator:
 
         res, anchors = collect_phantom(res, Anchor)
         if anchors:
-            h = bookmark_hash(''.join(
-                as_text(
-                    res,
-                    phantom_policy='warn',
-                    eval_local_href='elements',
-                    bookmark_hash_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True)))
+            h = bookmark_hash(
+                ''.join(
+                    as_text(
+                        res,
+                        phantom_policy='warn',
+                        eval_local_href='elements',
+                        bookmark_hash_policy='ignore',
+                        eval_whitespace=True,
+                        eval_verb=True,
+                    )
+                )
+            )
             for a in anchors:
                 self.ref_context[a.id_] = RefContextEntry('hash', h)
             res.append(BookmarkHash(h))
@@ -1305,7 +1383,9 @@ class StackMarkdownGenerator:
                     eval_local_href='elements',
                     bookmark_hash_policy='ignore',
                     eval_whitespace=True,
-                    eval_verb=True))
+                    eval_verb=True,
+                )
+            )
             for a in anchors:
                 self.ref_context[a.id_] = RefContextEntry('header', ref)
             if 'id' in attrib:
@@ -1393,14 +1473,18 @@ class StackMarkdownGenerator:
 
         res, anchors = collect_phantom(res, Anchor)
         if anchors or 'id' in attrib:
-            h = bookmark_hash(''.join(
-                as_text(
-                    res,
-                    'ignore',
-                    eval_local_href='elements',
-                    bookmark_hash_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True)))
+            h = bookmark_hash(
+                ''.join(
+                    as_text(
+                        res,
+                        'ignore',
+                        eval_local_href='elements',
+                        bookmark_hash_policy='ignore',
+                        eval_whitespace=True,
+                        eval_verb=True,
+                    )
+                )
+            )
             for a in anchors:
                 self.ref_context[a.id_] = RefContextEntry('hash', h)
             if 'id' in attrib:
@@ -1425,8 +1509,9 @@ class StackMarkdownGenerator:
 
         @stop_on_mdlist
         def insert_sub_indent_rule(e1, e2):
-            if (isinstance(e1, (LineBreak, Newline))
-                    and isinstance(e2, (str, VerbText))):
+            if isinstance(e1, (LineBreak, Newline)) and isinstance(
+                e2, (str, VerbText)
+            ):
                 return [e1, Indentation('  '), e2]
             return None
 
@@ -1437,8 +1522,9 @@ class StackMarkdownGenerator:
         def insert_indent_point_rule(e1, e2):
             if e1 is None:
                 return [None, MdListItemIndentPointAtBullet(), e2]
-            if (isinstance(e1, (LineBreak, Newline))
-                    and isinstance(e2, Indentation)):
+            if isinstance(e1, (LineBreak, Newline)) and isinstance(
+                e2, Indentation
+            ):
                 return [e1, MdLIstItemIndentPointOtherwise(), e2]
             return None
 
@@ -1492,12 +1578,14 @@ class StackMarkdownGenerator:
 
         @stop_on_mdlist
         def one_newline_between_li_rule(e1, e2):
-            if (isinstance(e1, LineBreak)
-                    and isinstance(e2, MdListItemIndentPointAtBullet)):
+            if isinstance(e1, LineBreak) and isinstance(
+                e2, MdListItemIndentPointAtBullet
+            ):
                 return [Newline(), e2]
             # if there's no newline at all, add one
-            if (isinstance(e1, (str, VerbText, LocalHref))
-                    and isinstance(e2, MdListItemIndentPointAtBullet)):
+            if isinstance(e1, (str, VerbText, LocalHref)) and isinstance(
+                e2, MdListItemIndentPointAtBullet
+            ):
                 return [e1, Newline(), e2]
             return None
 
@@ -1509,8 +1597,13 @@ class StackMarkdownGenerator:
         if 'li' in parents:
 
             def indent_one_level_rule(e1, e2):
-                if isinstance(e2, (MdListItemIndentPointAtBullet,
-                                   MdLIstItemIndentPointOtherwise)):
+                if isinstance(
+                    e2,
+                    (
+                        MdListItemIndentPointAtBullet,
+                        MdLIstItemIndentPointOtherwise,
+                    ),
+                ):
                     if self.options['indent_list_with_tab']:
                         return [e1, Indentation('\t'), e2]
                     return [e1, Indentation('    '), e2]
@@ -1521,9 +1614,15 @@ class StackMarkdownGenerator:
             lstrip_whitespace(res)
         else:
             res = [
-                e for e in res
-                if not isinstance(e, (MdListItemIndentPointAtBullet,
-                                      MdLIstItemIndentPointOtherwise))
+                e
+                for e in res
+                if not isinstance(
+                    e,
+                    (
+                        MdListItemIndentPointAtBullet,
+                        MdLIstItemIndentPointOtherwise,
+                    ),
+                )
             ]
             res.append(LineBreak())
 
@@ -1562,12 +1661,14 @@ class StackMarkdownGenerator:
 
         @stop_on_mdlist
         def one_newline_between_li_rule(e1, e2):
-            if (isinstance(e1, LineBreak)
-                    and isinstance(e2, MdListItemIndentPointAtBullet)):
+            if isinstance(e1, LineBreak) and isinstance(
+                e2, MdListItemIndentPointAtBullet
+            ):
                 return [Newline(), e2]
             # if there's no newline at all, add one
-            if (isinstance(e1, (str, VerbText, LocalHref))
-                    and isinstance(e2, MdListItemIndentPointAtBullet)):
+            if isinstance(e1, (str, VerbText, LocalHref)) and isinstance(
+                e2, MdListItemIndentPointAtBullet
+            ):
                 return [e1, Newline(), e2]
             return None
 
@@ -1579,8 +1680,13 @@ class StackMarkdownGenerator:
         if 'li' in parents:
 
             def indent_one_level_rule(e1, e2):
-                if isinstance(e2, (MdListItemIndentPointAtBullet,
-                                   MdLIstItemIndentPointOtherwise)):
+                if isinstance(
+                    e2,
+                    (
+                        MdListItemIndentPointAtBullet,
+                        MdLIstItemIndentPointOtherwise,
+                    ),
+                ):
                     if self.options['indent_list_with_tab']:
                         return [e1, Indentation('\t'), e2]
                     return [e1, Indentation('    '), e2]
@@ -1591,9 +1697,15 @@ class StackMarkdownGenerator:
             lstrip_whitespace(res)
         else:
             res = [
-                e for e in res
-                if not isinstance(e, (MdListItemIndentPointAtBullet,
-                                      MdLIstItemIndentPointOtherwise))
+                e
+                for e in res
+                if not isinstance(
+                    e,
+                    (
+                        MdListItemIndentPointAtBullet,
+                        MdLIstItemIndentPointOtherwise,
+                    ),
+                )
             ]
             res.append(LineBreak())
 
@@ -1616,14 +1728,18 @@ class StackMarkdownGenerator:
 
         res, anchors = collect_phantom(res, Anchor)
         if anchors:
-            h = bookmark_hash(''.join(
-                as_text(
-                    res,
-                    'ignore',
-                    eval_local_href='elements',
-                    bookmark_hash_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True)))
+            h = bookmark_hash(
+                ''.join(
+                    as_text(
+                        res,
+                        'ignore',
+                        eval_local_href='elements',
+                        bookmark_hash_policy='ignore',
+                        eval_whitespace=True,
+                        eval_verb=True,
+                    )
+                )
+            )
             for a in anchors:
                 self.ref_context[a.id_] = RefContextEntry('hash', h)
         else:
@@ -1725,7 +1841,8 @@ class StackMarkdownGenerator:
             return None
 
         def handle_sub_symbol(
-                symbol: str) -> ty.List[ty.Union[VerbText, Whitespace]]:
+            symbol: str,
+        ) -> ty.List[ty.Union[VerbText, Whitespace]]:
             texts = recognize_whitespace(symbol)
             texts = filter(None, texts)
             return [VerbText(e) if isinstance(e, str) else e for e in texts]
@@ -1752,7 +1869,8 @@ class StackMarkdownGenerator:
             return None
 
         def handle_sup_symbol(
-                symbol: str) -> ty.List[ty.Union[VerbText, Whitespace]]:
+            symbol: str,
+        ) -> ty.List[ty.Union[VerbText, Whitespace]]:
             texts = recognize_whitespace(symbol)
             texts = filter(None, texts)
             return [VerbText(e) if isinstance(e, str) else e for e in texts]
@@ -1833,8 +1951,9 @@ class StackMarkdownGenerator:
             return None
         res = as_text(elements, 'pass')
 
-        n_cells = max([e.n_cells for e in res if isinstance(e, MdTableRow)],
-                      default=0)
+        n_cells = max(
+            [e.n_cells for e in res if isinstance(e, MdTableRow)], default=0
+        )
         if not n_cells:
             return res
 
@@ -1850,29 +1969,31 @@ class StackMarkdownGenerator:
                     self.row_ind += 1
                     if isinstance(e1, (LineBreak, Newline)):
                         if self.row_ind == 2:
-                            headerline = ('|'
-                                          + '|'.join('---'
-                                                     for _ in range(n_cells))
-                                          + '|')
+                            headerline = (
+                                '|'
+                                + '|'.join('---' for _ in range(n_cells))
+                                + '|'
+                            )
                             return [Newline(), headerline, Newline()]
                         if self.row_ind > 2:
                             return Newline()
                     if self.row_ind == 2:
-                        headerline = ('|'
-                                      + '|'.join('---' for _ in range(n_cells))
-                                      + '|')
+                        headerline = (
+                            '|' + '|'.join('---' for _ in range(n_cells)) + '|'
+                        )
                         return [e1, Newline(), headerline, Newline()]
                     if self.row_ind > 2:
                         return [e1, Newline()]
                 return None
 
-        res2 = stack_merge(res,
-                           insert_headline_and_one_newline_between_row_rule())
+        res2 = stack_merge(
+            res, insert_headline_and_one_newline_between_row_rule()
+        )
         if res2 != res:
             res = res2
         else:
             res.append(Newline())
-            headerline = ('|' + '|'.join('---' for _ in range(n_cells)) + '|')
+            headerline = '|' + '|'.join('---' for _ in range(n_cells)) + '|'
             res.append(headerline)
 
         res = [e for e in res if not isinstance(e, MdTableRow)]
@@ -1897,14 +2018,16 @@ class StackMarkdownGenerator:
             match = re.fullmatch(
                 r'data:(.+/)?(.+);base64,(.+)',
                 src,
-                flags=re.DOTALL | re.MULTILINE)
+                flags=re.DOTALL | re.MULTILINE,
+            )
             if match:
                 data = base64.b64decode(match.group(3).strip())
                 summary = hashlib.sha1(data).hexdigest()
                 tofile = Path(self.options['write_base64_img_to'])
                 if not tofile.is_dir():
                     raise FileNotFoundError(
-                        '"{}" (dir) not found'.format(tofile))
+                        '"{}" (dir) not found'.format(tofile)
+                    )
                 tofile /= '{}.{}'.format(summary, match.group(2))
                 with open(tofile, 'wb') as outfile:
                     outfile.write(data)
@@ -1935,13 +2058,16 @@ class StackMarkdownGenerator:
                     merge_whitespace=False,
                     eval_whitespace=True,
                     bookmark_hash_policy='raise',
-                    eval_verb=True))
+                    eval_verb=True,
+                )
+            )
             return [CodeBlock(text), LineBreak()]
         res = as_text(
             elements,
             'warn',
             merge_whitespace=self.options['join_lines_when_possible'],
-            bookmark_hash_policy='raise')
+            bookmark_hash_policy='raise',
+        )
         if self.options['join_lines_when_possible']:
 
             def sub_newline_with_space_rule(e1, e2):
@@ -1956,7 +2082,9 @@ class StackMarkdownGenerator:
                 'ignore',
                 eval_whitespace=True,
                 bookmark_hash_policy='raise',
-                eval_verb=True))
+                eval_verb=True,
+            )
+        )
         return [InlineCode(text)]
 
     proc_samp = proc_code
@@ -1982,13 +2110,16 @@ class StackMarkdownGenerator:
                 res,
                 'pass',
                 merge_whitespace=False,
-                bookmark_hash_policy='raise')
+                bookmark_hash_policy='raise',
+            )
             if any(not isinstance(e, (CodeBlock, Whitespace)) for e in res):
                 warnings.warn('<pre> contains non code block element; ignored')
             res = [e for e in res if isinstance(e, CodeBlock)]
             if len(res) > 1:
-                warnings.warn('<pre> contains more than one code block; '
-                              'using the first one only')
+                warnings.warn(
+                    '<pre> contains more than one code block; '
+                    'using the first one only'
+                )
             return [res[0], LineBreak()]
 
         text = ''.join(
@@ -1998,7 +2129,9 @@ class StackMarkdownGenerator:
                 merge_whitespace=False,
                 eval_whitespace=True,
                 bookmark_hash_policy='raise',
-                eval_verb=True))
+                eval_verb=True,
+            )
+        )
         return [CodeBlock(text), LineBreak()]
 
     def proc_div(
@@ -2020,27 +2153,34 @@ class StackMarkdownGenerator:
                     res,
                     'pass',
                     merge_whitespace=False,
-                    bookmark_hash_policy='raise')
+                    bookmark_hash_policy='raise',
+                )
                 language = attrib['class'][9:]
 
                 if any(isinstance(e, CodeBlock) for e in res):
-                    if any(not isinstance(e, (CodeBlock, Whitespace))
-                           for e in res):
+                    if any(
+                        not isinstance(e, (CodeBlock, Whitespace)) for e in res
+                    ):
                         warnings.warn(
-                            '<pre> contains non code block element; ignored')
+                            '<pre> contains non code block element; ignored'
+                        )
                     res = [e for e in res if isinstance(e, CodeBlock)]
                     if len(res) > 1:
                         warnings.warn(
                             '<pre> contains more than one code block; '
-                            'using the first one only')
+                            'using the first one only'
+                        )
                     res = [res[0]]
                     res[0].language = language
                     res.append(LineBreak())
                     return res
 
                 warnings.warn(
-                    ('<div class=""> contains unexpected non-code elements; '
-                     'passed as is').format(attrib['class']))
+                    (
+                        '<div class=""> contains unexpected non-code elements; '
+                        'passed as is'
+                    ).format(attrib['class'])
+                )
                 return as_text(res, 'pass')
 
             if attrib['class'] == 'math':
@@ -2050,7 +2190,9 @@ class StackMarkdownGenerator:
                         'warn',
                         eval_whitespace=True,
                         bookmark_hash_policy='raise',
-                        eval_verb=True))
+                        eval_verb=True,
+                    )
+                )
                 text = text.strip()
                 if text.startswith('$$') and text.endswith('$$'):
                     return [MathBlock(text[2:-2]), LineBreak()]
@@ -2082,21 +2224,26 @@ class StackMarkdownGenerator:
                 # return as_text(res, 'pass')
 
             raise NotImplementedError(
-                'not implemented for <div> class "{}"'.format(attrib['class']))
+                'not implemented for <div> class "{}"'.format(attrib['class'])
+            )
 
         if 'id' in attrib:
             if contains_unparsed_element(elements):
                 return None
             res = as_text(elements, 'pass')
 
-            h = bookmark_hash(''.join(
-                as_text(
-                    res,
-                    'ignore',
-                    eval_local_href='elements',
-                    bookmark_hash_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True)))
+            h = bookmark_hash(
+                ''.join(
+                    as_text(
+                        res,
+                        'ignore',
+                        eval_local_href='elements',
+                        bookmark_hash_policy='ignore',
+                        eval_whitespace=True,
+                        eval_verb=True,
+                    )
+                )
+            )
             self.ref_context[attrib['id']] = RefContextEntry('hash', h)
             res.append(BookmarkHash(h))
             res.append(LineBreak())
@@ -2128,36 +2275,46 @@ class StackMarkdownGenerator:
                     'warn',
                     eval_whitespace=True,
                     bookmark_hash_policy='raise',
-                    eval_verb=True))
+                    eval_verb=True,
+                )
+            )
 
             res = search_slashparenthesis_inline_math(text)
             if any(isinstance(e, InlineMath) for e in res):
                 if any(not isinstance(e, InlineMath) for e in res):
                     warnings.warn(
                         '<div class="math"> contains unexpected non-math '
-                        'elements; ignored')
+                        'elements; ignored'
+                    )
                 res = [e for e in res if isinstance(e, InlineMath)]
                 if len(res) > 1:
                     warnings.warn(
                         '<div class="math"> contains more than one inline '
-                        'math; using the first one only')
+                        'math; using the first one only'
+                    )
                 return [res[0]]
 
-            warnings.warn('<span class="math"> contains unexpected non-math '
-                          'elements; passed as is')
+            warnings.warn(
+                '<span class="math"> contains unexpected non-math '
+                'elements; passed as is'
+            )
             return as_text(res, 'pass')
 
         if 'id' in attrib:
             res = as_text(elements, 'pass')
 
-            h = bookmark_hash(''.join(
-                as_text(
-                    res,
-                    'ignore',
-                    eval_local_href='elements',
-                    bookmark_hash_policy='ignore',
-                    eval_whitespace=True,
-                    eval_verb=True)))
+            h = bookmark_hash(
+                ''.join(
+                    as_text(
+                        res,
+                        'ignore',
+                        eval_local_href='elements',
+                        bookmark_hash_policy='ignore',
+                        eval_whitespace=True,
+                        eval_verb=True,
+                    )
+                )
+            )
             self.ref_context[attrib['id']] = RefContextEntry('hash', h)
             res.append(BookmarkHash(h))
             res.append(LineBreak())
@@ -2212,10 +2369,8 @@ class StackMarkdownGenerator:
     ) -> ty.Optional[ty.List[IntermediateElementType]]:
         if attrib.get('encoding', '') == 'application/x-tex':
             res = as_text(
-                elements,
-                'raise',
-                merge_whitespace=False,
-                eval_whitespace=True)
+                elements, 'raise', merge_whitespace=False, eval_whitespace=True
+            )
             text = ''.join(e for e in res if isinstance(e, str)).strip()
             return [MathMLTexAnnotation(text)]
         return None
@@ -2239,15 +2394,16 @@ class StackMarkdownGenerator:
             math_latex_str = attrib['alttext']
         elif any(isinstance(e, MathMLTexAnnotation) for e in elements):
             math_latex_str = str(
-                next(
-                    e for e in elements if isinstance(e, MathMLTexAnnotation)))
+                next(e for e in elements if isinstance(e, MathMLTexAnnotation))
+            )
         else:
             # no hint at all, parse from scratch
             mathml_str = regenerate_xml('math', attrib, elements)
             dom = etree.fromstring(mathml_str)
             nmltex_file = str(
                 Path(__file__).parent
-                / 'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl')
+                / 'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl'
+            )
             xslt = etree.parse(nmltex_file)
             transform = etree.XSLT(xslt)
             math_latex_str = str(transform(dom)).strip()
@@ -2268,8 +2424,10 @@ class StackMarkdownGenerator:
             res.append(MathBlock(math_latex_str))
         else:
             warnings.warn(
-                'unknown attribute display={} in <math>; default to inline'
-                .format(display))
+                'unknown attribute display={} in <math>; default to inline'.format(
+                    display
+                )
+            )
             res.append(InlineMath(math_latex_str))
         return res
 
@@ -2278,36 +2436,47 @@ def _make_parser():
     from pathlib import Path
 
     args = argparse.ArgumentParser(
-        description='Convert an HTML file to Obsidian markdown.')
+        description='Convert an HTML file to Obsidian markdown.'
+    )
     args.add_argument('--ul-bullet', dest='ul_bullet', choices=['-', '+', '*'])
     args.add_argument(
-        '--strong-symbol', dest='strong_symbol', choices=['*', '_'])
+        '--strong-symbol', dest='strong_symbol', choices=['*', '_']
+    )
     args.add_argument('--em-symbol', dest='em_symbol', choices=['*', '_'])
     args.add_argument(
-        '--sub-start-symbol', dest='sub_start_symbol', metavar='CHARS')
+        '--sub-start-symbol', dest='sub_start_symbol', metavar='CHARS'
+    )
     args.add_argument(
-        '--sub-end-symbol', dest='sub_end_symbol', metavar='CHARS')
+        '--sub-end-symbol', dest='sub_end_symbol', metavar='CHARS'
+    )
     args.add_argument(
-        '--sup-start-symbol', dest='sup_start_symbol', metavar='CHARS')
+        '--sup-start-symbol', dest='sup_start_symbol', metavar='CHARS'
+    )
     args.add_argument(
-        '--sup-end-symbol', dest='sup_end_symbol', metavar='CHARS')
+        '--sup-end-symbol', dest='sup_end_symbol', metavar='CHARS'
+    )
     args.add_argument(
-        '--join', dest='join_lines_when_possible', action='store_true')
+        '--join', dest='join_lines_when_possible', action='store_true'
+    )
     args.add_argument(
         '--elevate-header-to',
         dest='try_make_highest_header_hn',
         type=int,
-        metavar='N')
+        metavar='N',
+    )
     args.add_argument(
         '--indent-list-with-tab',
         dest='indent_list_with_tab',
-        action='store_true')
+        action='store_true',
+    )
     args.add_argument(
-        '--write-base64-img-to', dest='write_base64_img_to', type=Path)
+        '--write-base64-img-to', dest='write_base64_img_to', type=Path
+    )
     args.add_argument('--url', help='url if the html is downloaded from web')
     args.add_argument('html_file', type=Path, help='the html file to read')
     args.add_argument(
-        'output_file', type=Path, help='the markdown file to write')
+        'output_file', type=Path, help='the markdown file to write'
+    )
     return args
 
 
