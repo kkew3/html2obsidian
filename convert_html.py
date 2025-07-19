@@ -109,10 +109,10 @@ class KeepOnlySupportedTarget:
         self.strict = strict
         self.nodes: ty.List[SupportedElementType] = []
         self.stack: ty.List[str] = []
-        self.active = False
+        self.stack_active: ty.List[bool] = []
 
     def start(self, tag, attrib):
-        self.active = True
+        active = True
         tag = tag.lower()
         # the separator
         if tag == 'hr':
@@ -249,18 +249,23 @@ class KeepOnlySupportedTarget:
         ]:
             self.nodes.append(StartElement(tag, attrib))
             self.stack.append(tag)
+        elif tag == 'body':
+            self.nodes.append(StartElement(tag))
+            self.stack.append(tag)
         else:
-            self.active = False
+            active = False
+        self.stack_active.append(active)
 
     def end(self, tag):
         tag = tag.lower()
         if self.stack and self.stack[-1] == tag:
             self.nodes.append(EndElement(tag))
             del self.stack[-1]
-        self.active = True
+        self.stack_active.pop()
 
     def data(self, data):
-        if self.active:
+        active = self.stack_active[-1] if self.stack_active else True
+        if active:
             data = data.replace('\r\n', '\n')
             self.nodes.append(data)
 
@@ -1257,6 +1262,14 @@ class StackMarkdownGenerator:
                     self.page_url_info.scheme, self.page_url_info.netloc, url
                 )
         return url
+
+    def proc_body(
+        self,
+        _attrib: ty.Dict[str, str],
+        elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> ty.Optional[ty.List[IntermediateElementType]]:
+        return elements
 
     def proc_hr(
         self,

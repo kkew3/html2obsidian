@@ -7,7 +7,7 @@ import convert_html
 
 class TestKeepOnlySupportedTarget:
     def test_known_unknown_known(self):
-        html = '<p>hello <foo>world <p>again</p></foo>!</p><bar>hola</bar>'
+        html = '<p>hello <foo>world <p>again</p> blah</foo>!</p><bar>hola</bar>'
         parser = etree.HTMLParser(
             target=convert_html.KeepOnlySupportedTarget(True)
         )
@@ -15,6 +15,7 @@ class TestKeepOnlySupportedTarget:
             etree.HTML(html, parser), 'pass', 'pass'
         )
         assert elements == [
+            convert_html.StartElement('body'),
             convert_html.StartElement('p'),
             'hello',
             convert_html.Space(),
@@ -23,10 +24,11 @@ class TestKeepOnlySupportedTarget:
             convert_html.EndElement('p'),
             '!',
             convert_html.EndElement('p'),
+            convert_html.EndElement('body'),
         ]
 
     def test_unknown_known_unknown(self):
-        html = '<foo>hello <p>world <bar>again</bar>!</p></foo><baz>hola</baz>'
+        html = '<foo>hello <p>world <bar>again</bar>!</p> blah </foo><baz>hola</baz>'
         parser = etree.HTMLParser(
             target=convert_html.KeepOnlySupportedTarget(True)
         )
@@ -34,11 +36,13 @@ class TestKeepOnlySupportedTarget:
             etree.HTML(html, parser), 'pass', 'pass'
         )
         assert elements == [
+            convert_html.StartElement('body'),
             convert_html.StartElement('p'),
             'world',
             convert_html.Space(),
             '!',
             convert_html.EndElement('p'),
+            convert_html.EndElement('body'),
         ]
 
 
