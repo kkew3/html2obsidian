@@ -3,7 +3,10 @@ from setuptools import setup
 setup(
     name='html2obsidian',
     version='0.4.0',
-    py_modules=['convert_html', 'test_convert_html'],
+    packages=['html2obsidian'],
+    package_data={
+        'html2obsidian': ['xsltml_2.1.2/*.xsl'],
+    },
     python_requires='>=3.9',
     install_requires=[
         'lxml>=5.1.0,<=6.0',
@@ -15,7 +18,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'html2obsidian = convert_html:main',
+            'html2obsidian = html2obsidian.convert_html:main',
         ],
     },
 )
