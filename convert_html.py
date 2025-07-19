@@ -252,6 +252,9 @@ class KeepOnlySupportedTarget:
         elif tag == 'body':
             self.nodes.append(StartElement(tag))
             self.stack.append(tag)
+        elif tag in ['section', 'aside']:
+            self.nodes.append(StartElement(tag))
+            self.stack.append(tag)
         else:
             active = False
         self.stack_active.append(active)
@@ -1264,6 +1267,22 @@ class StackMarkdownGenerator:
         return url
 
     def proc_body(
+        self,
+        _attrib: ty.Dict[str, str],
+        elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> ty.Optional[ty.List[IntermediateElementType]]:
+        return elements
+
+    def proc_section(
+        self,
+        _attrib: ty.Dict[str, str],
+        elements: ty.List[IntermediateElementType],
+        _parents: ty.List[StartElement],
+    ) -> ty.Optional[ty.List[IntermediateElementType]]:
+        return elements
+
+    def proc_aside(
         self,
         _attrib: ty.Dict[str, str],
         elements: ty.List[IntermediateElementType],

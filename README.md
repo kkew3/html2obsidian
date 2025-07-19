@@ -7,6 +7,7 @@ This lib (a simple `__main__` interface attached) converts an HTML to [Obsidian]
 ## Features
 
 - Supported tags:
+  `<body>`, `<section>`, `<aside>`,
   `<hr>`,
   `<p>`,
   `<h1>`, `<h2>`, `<h3>`, `<h4>`, `<h5>`, `<h6>`, 
