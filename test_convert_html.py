@@ -182,7 +182,6 @@ class TestStackMarkdownGenerator:
 
     def test_nojoin_multiline_par(self):
         g, md = self._case('nojoin_multiline_par')
-        # if this line fails, there may be bugs in pytest or python
         assert g.options['join_lines_when_possible'] is False
         assert g.generate() == md
 
@@ -200,7 +199,6 @@ class TestStackMarkdownGenerator:
 
     def test_nojoin_multiline_li(self):
         g, md = self._case('nojoin_multiline_li')
-        # if this line fails, there may be bugs in pytest or python
         assert g.options['join_lines_when_possible'] is False
         assert g.generate() == md
 
