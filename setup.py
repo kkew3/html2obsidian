@@ -23,5 +23,6 @@ setup(
     },
     scripts=[
         'scripts/diagnose_convergence_issue.py',
+        'scripts/inline_xsl_docs.py',
     ],
 )
