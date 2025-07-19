@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='html2obsidian',
-    version='0.3.0',
+    version='0.4.0',
     py_modules=['convert_html', 'test_convert_html'],
     python_requires='>=3.9',
     install_requires=[

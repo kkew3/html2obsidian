@@ -1136,7 +1136,8 @@ class StackMarkdownGenerator:
         options: ty.Dict[str, ty.Any],
         elements: ty.List[SupportedElementType],
         page_url: str = None,
-        max_loop: int = 100,
+        max_loop: int = 10,
+        max_retry: int = 10,
     ) -> None:
         self.options = self.default_options.copy()
         for k in self.options:
@@ -1152,13 +1153,30 @@ class StackMarkdownGenerator:
         else:
             self.page_url_info = None
         self.max_loop = max_loop
+        self.max_retry = max_retry
+
+    def break_tie(self):
+        # Unpack unresolved LocalHref into inner elements.
+        res = []
+        for e in self.stack:
+            if isinstance(e, LocalHref) and e.ref is None:
+                res.extend(e.elements)
+            else:
+                res.append(e)
+        self.stack = res
 
     def generate(self) -> str:
         queue = []
         n_loop = 1
+        n_attempt = 1
         while not check_converged(self.stack):
-            if n_loop > self.max_loop:
+            if n_attempt > self.max_retry:
                 raise ProcessingNotConvergedError
+            if n_loop > self.max_loop:
+                n_loop = 1
+                n_attempt += 1
+                self.break_tie()
+
             queue.clear()
             queue.extend(self.stack)
             self.stack.clear()
