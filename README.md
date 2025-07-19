@@ -30,7 +30,7 @@ This utility converts an HTML to [Obsidian][1]-style Markdown.
 
 This library requires `python>=3.9`.
 
-To install dependencies:
+To install:
 
 ```bash
 pip install -e .
