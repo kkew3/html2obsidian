@@ -8,10 +8,7 @@ import re
 import functools
 from urllib.parse import urlparse
 import warnings
-import os
 import importlib.resources
-import tempfile
-import shutil
 
 from lxml import etree
 from lxml.etree import Element
@@ -1096,19 +1093,12 @@ def regenerate_xml(
 
 class MathMLParser:
     def __init__(self):
-        xsltml_files = importlib.resources.files('html2obsidian').joinpath(
-            'xsltml_2.1.2'
+        xslt = etree.fromstring(
+            importlib.resources.files('html2obsidian')
+            .joinpath('xsltml_2.1.2/mmltex_inlined.xsl')
+            .read_bytes()
         )
-        with tempfile.TemporaryDirectory() as tmpdir:
-            for path in xsltml_files.iterdir():
-                if path.name.endswith('.xsl'):
-                    with (
-                        open(os.path.join(tmpdir, path.name), 'wb') as fp,
-                        path.open('rb') as infile,
-                    ):
-                        shutil.copyfileobj(infile, fp)
-            xslt = etree.parse(os.path.join(tmpdir, 'mmltex.xsl'))
-            self.transform = etree.XSLT(xslt)
+        self.transform = etree.XSLT(xslt)
 
     def parse_as_tex(self, mathml_str: str) -> str:
         dom = etree.fromstring(mathml_str)
