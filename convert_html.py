@@ -1,3 +1,4 @@
+import sys
 import argparse
 import typing as ty
 import hashlib
@@ -2461,7 +2462,10 @@ def _make_parser():
 
     args = argparse.ArgumentParser(
         prog='html2obsidian',
-        description='Convert an HTML file to Obsidian markdown.',
+        description=(
+            'Convert an HTML file to Obsidian-style markdown '
+            'and write to stdout.'
+        ),
     )
     args.add_argument('--ul-bullet', dest='ul_bullet', choices=['-', '+', '*'])
     args.add_argument(
@@ -2497,10 +2501,16 @@ def _make_parser():
     args.add_argument(
         '--write-base64-img-to', dest='write_base64_img_to', type=Path
     )
-    args.add_argument('--url', help='url if the html is downloaded from web')
-    args.add_argument('html_file', type=Path, help='the html file to read')
     args.add_argument(
-        'output_file', type=Path, help='the markdown file to write'
+        '--url',
+        help=(
+            'url if the html is downloaded from web; '
+            'this helps resolve within-doc link'
+        ),
+    )
+    args.add_argument(
+        'html_file',
+        help='the html file to read; pass `-` to read from stdin',
     )
     return args
 
@@ -2521,10 +2531,12 @@ def main():
         'write_base64_img_to',
     ]
     options = {k: getattr(args, k) for k in keys}
-    with open(args.html_file, encoding='utf-8') as infile:
-        html = infile.read()
+    if args.html_file == '-':
+        html = sys.stdin.read()
+    else:
+        with open(args.html_file, encoding='utf-8') as infile:
+            html = infile.read()
     parser = etree.HTMLParser(target=KeepOnlySupportedTarget(True))
     elements = etree.HTML(html, parser)
     output = StackMarkdownGenerator(options, elements, args.url).generate()
-    with open(args.output_file, 'w', encoding='utf-8') as outfile:
-        outfile.write(output)
+    print(output, end='')
