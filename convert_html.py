@@ -2170,7 +2170,7 @@ class StackMarkdownGenerator:
 
                 warnings.warn(
                     (
-                        '<div class=""> contains unexpected non-code elements; '
+                        '<div class="{}"> contains unexpected non-code elements; '
                         'passed as is'
                     ).format(attrib['class'])
                 )
