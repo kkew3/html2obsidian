@@ -9,6 +9,10 @@ import functools
 from urllib.parse import urlparse
 from xml.etree import ElementTree as ET
 import warnings
+import os
+import importlib.resources
+import tempfile
+import shutil
 
 from lxml import etree
 
@@ -1090,6 +1094,27 @@ def regenerate_xml(
     return ET.tostring(stack[0], encoding='utf-8').decode('utf-8')
 
 
+class MathMLParser:
+    def __init__(self):
+        xsltml_files = importlib.resources.files('html2obsidian').joinpath(
+            'xsltml_2.1.2'
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for path in xsltml_files.iterdir():
+                if path.name.endswith('.xsl'):
+                    with (
+                        open(os.path.join(tmpdir, path.name), 'wb') as fp,
+                        path.open('rb') as infile,
+                    ):
+                        shutil.copyfileobj(infile, fp)
+            xslt = etree.parse(os.path.join(tmpdir, 'mmltex.xsl'))
+            self.transform = etree.XSLT(xslt)
+
+    def parse_as_tex(self, mathml_str: str) -> str:
+        dom = etree.fromstring(mathml_str)
+        return str(self.transform(dom)).strip()
+
+
 class MathMLTexAnnotation(VerbText):
     pass
 
@@ -1144,6 +1169,7 @@ class StackMarkdownGenerator:
             if options.get(k, None) is not None:
                 self.options[k] = options[k]
 
+        self.mathml_parser = MathMLParser()
         self.stack: ty.List[IntermediateElementType] = elements
         # to store reference context
         self.ref_context: ty.Dict[str, RefContextEntry] = {}
@@ -2442,14 +2468,7 @@ class StackMarkdownGenerator:
         else:
             # no hint at all, parse from scratch
             mathml_str = regenerate_xml('math', attrib, elements)
-            dom = etree.fromstring(mathml_str)
-            nmltex_file = str(
-                Path(__file__).parent
-                / 'extern/oerpub+mathconverter/xsl_yarosh/mmltex.xsl'
-            )
-            xslt = etree.parse(nmltex_file)
-            transform = etree.XSLT(xslt)
-            math_latex_str = str(transform(dom)).strip()
+            math_latex_str = self.mathml_parser.parse_as_tex(mathml_str)
             if display == 'inline':
                 if math_latex_str.startswith('$'):
                     math_latex_str = math_latex_str[1:].lstrip()
